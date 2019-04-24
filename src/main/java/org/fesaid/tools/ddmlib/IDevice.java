@@ -371,6 +371,12 @@ public interface IDevice extends IShellEnabledDevice {
         throw new UnsupportedOperationException();
     }
 
+    String execute(String command) throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
+        IOException;
+
+    String execute(String command, Long timeout, TimeUnit timeUnit) throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
+        IOException;
+
     /**
      * Runs the event log service and outputs the event log to the {@link LogReceiver}.
      * <p>This call is blocking until {@link LogReceiver#isCancelled()} returns true.
@@ -426,6 +432,20 @@ public interface IDevice extends IShellEnabledDevice {
             throws TimeoutException, AdbCommandRejectedException, IOException;
 
     /**
+     * Creates a port forwarding between a local TCP port and a remote Unix Domain Socket.
+     *
+     * @param unixSocket the local unix socket to forward
+     * @param remoteSocketName name of the unix domain socket created on the device
+     * @param namespace namespace in which the unix domain socket was created
+     * @throws TimeoutException in case of timeout on the connection.
+     * @throws AdbCommandRejectedException if adb rejects the command
+     * @throws IOException in case of I/O error on the connection.
+     */
+    void createForward(String unixSocket, String remoteSocketName,
+        DeviceUnixSocketNamespace namespace)
+        throws TimeoutException, AdbCommandRejectedException, IOException;
+
+    /**
      * Removes a port forwarding between a local and a remote port.
      *
      * @param localPort the local port to forward
@@ -452,6 +472,20 @@ public interface IDevice extends IShellEnabledDevice {
             throws TimeoutException, AdbCommandRejectedException, IOException;
 
     /**
+     * Removes an existing port forwarding between a local and a remote port.
+     *
+     * @param unixSocket the local unix socket to forward
+     * @param remoteSocketName the remote unix domain socket name.
+     * @param namespace namespace in which the unix domain socket was created
+     * @throws TimeoutException in case of timeout on the connection.
+     * @throws AdbCommandRejectedException if adb rejects the command
+     * @throws IOException in case of I/O error on the connection.
+     */
+    void removeForward(String unixSocket, String remoteSocketName,
+        DeviceUnixSocketNamespace namespace)
+        throws TimeoutException, AdbCommandRejectedException, IOException;
+
+    /**
      * Returns the name of the client by pid or <code>null</code> if pid is unknown
      * @param pid the pid of the client.
      */
@@ -469,6 +503,20 @@ public interface IDevice extends IShellEnabledDevice {
      */
     void pushFile(String local, String remote)
             throws IOException, AdbCommandRejectedException, TimeoutException, SyncException;
+
+    /**
+     * Push a single file.
+     * @param localStream the local stream.
+     * @param remote The remote filepath.
+     * @param mode the file permission mode
+     *
+     * @throws IOException in case of I/O error on the connection.
+     * @throws AdbCommandRejectedException if adb rejects the command
+     * @throws TimeoutException in case of a timeout reading responses from the device.
+     * @throws SyncException if file could not be pushed
+     */
+    void pushFile(InputStream localStream, String remote, int mode)
+        throws IOException, AdbCommandRejectedException, TimeoutException, SyncException;
 
     /**
      * Pulls a single file.
@@ -496,6 +544,8 @@ public interface IDevice extends IShellEnabledDevice {
      */
     void installPackage(String packageFilePath, boolean reinstall, String... extraArgs)
             throws InstallException;
+
+    void installPackage(InputStream inputStream, boolean reinstall, String... extraArgs) throws InstallException, TimeoutException, AdbCommandRejectedException, SyncException, IOException;
 
     /**
      * Installs an Android application on device. This is a helper method that combines the
@@ -630,7 +680,20 @@ public interface IDevice extends IShellEnabledDevice {
      * @throws SyncException if an error happens during the push of the package on the device.
      */
     String syncPackageToDevice(String localFilePath)
-            throws TimeoutException, AdbCommandRejectedException, IOException, SyncException;
+        throws TimeoutException, AdbCommandRejectedException, IOException, SyncException;
+
+    /**
+     * Pushes a file to device
+     *
+     * @param localFileStream file input stream on local host
+     * @return {@link String} destination path on device for file
+     * @throws TimeoutException in case of timeout on the connection.
+     * @throws AdbCommandRejectedException if adb rejects the command
+     * @throws IOException in case of I/O error on the connection.
+     * @throws SyncException if an error happens during the push of the package on the device.
+     */
+    String syncPackageToDevice(InputStream localFileStream)
+        throws TimeoutException, AdbCommandRejectedException, IOException, SyncException;
 
     /**
      * Installs the application package that was pushed to a temporary location on the device.
@@ -834,4 +897,8 @@ public interface IDevice extends IShellEnabledDevice {
      */
     @NonNull
     AndroidVersion getVersion();
+
+    void setIme(String ime) throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException;
+
+    String getPackageVersionName(String packageName) throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException;
 }

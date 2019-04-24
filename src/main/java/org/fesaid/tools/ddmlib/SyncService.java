@@ -2,6 +2,7 @@ package org.fesaid.tools.ddmlib;
 
 import com.android.annotations.NonNull;
 import com.android.annotations.Nullable;
+import java.io.InputStream;
 import org.fesaid.tools.ddmlib.AdbHelper.AdbResponse;
 import org.fesaid.tools.ddmlib.FileListingService.FileEntry;
 import org.fesaid.tools.ddmlib.SyncException.SyncError;
@@ -393,6 +394,16 @@ public class SyncService {
         monitor.stop();
     }
 
+    public void pushFile(InputStream local, String remote, ISyncProgressMonitor monitor)
+        throws SyncException, IOException, TimeoutException {
+        doPushFile(local, remote, monitor, 0644);
+    }
+
+    public void pushFile(InputStream stream, String remote, ISyncProgressMonitor monitor, int mode)
+        throws TimeoutException, SyncException, IOException {
+        doPushFile(stream, remote, monitor, mode);
+    }
+
     /**
      * compute the recursive file size of all the files in the list. Folder
      * have a weight of 1.
@@ -699,6 +710,84 @@ public class SyncService {
         if (!checkResult(result, ID_OKAY)) {
             throw new SyncException(SyncError.TRANSFER_PROTOCOL_ERROR,
                     readErrorMessage(result, timeOut));
+        }
+    }
+
+    /**
+     * Push a single file
+     * @param localStream the local stream to push
+     * @param remotePath the remote file (length max is 1024)
+     * @param monitor the monitor. The monitor must be started already.
+     *
+     * @throws SyncException if file could not be pushed
+     * @throws IOException in case of I/O error on the connection.
+     * @throws TimeoutException in case of a timeout reading responses from the device.
+     */
+    private void doPushFile(InputStream localStream, String remotePath,
+        ISyncProgressMonitor monitor, int mode) throws SyncException, IOException, TimeoutException {
+        byte[] msg;
+
+        final int timeOut = DdmPreferences.getTimeOut();
+
+        try {
+            byte[] remotePathContent = remotePath.getBytes(AdbHelper.DEFAULT_CHARSET);
+
+            if (remotePathContent.length > REMOTE_PATH_MAX_LENGTH) {
+                throw new SyncException(SyncError.REMOTE_PATH_LENGTH);
+            }
+
+            // create the header for the action
+            msg = createSendFileReq(ID_SEND, remotePathContent, mode);
+
+            // and send it. We use a custom try/catch block to make the difference between
+            // file and network IO exceptions.
+            AdbHelper.write(mChannel, msg, -1, timeOut);
+
+            System.arraycopy(ID_DATA, 0, getBuffer(), 0, ID_DATA.length);
+
+            // look while there is something to read
+            while (true) {
+                // check if we're canceled
+                if (monitor.isCanceled()) {
+                    throw new SyncException(SyncError.CANCELED);
+                }
+
+                // read up to SYNC_DATA_MAX
+                int readCount = localStream.read(getBuffer(), 8, SYNC_DATA_MAX);
+
+                if (readCount == -1) {
+                    // we reached the end of the file
+                    break;
+                }
+
+                // now send the data to the device
+                // first write the amount read
+                ArrayHelper.swap32bitsToArray(readCount, getBuffer(), 4);
+
+                // now write it
+                AdbHelper.write(mChannel, getBuffer(), readCount+8, timeOut);
+
+                // and advance the monitor
+                monitor.advance(readCount);
+            }
+        } finally {
+        }
+
+        // create the DONE message
+        long time = System.currentTimeMillis() / 1000;
+        msg = createReq(ID_DONE, (int)time);
+
+        // and send it.
+        AdbHelper.write(mChannel, msg, -1, timeOut);
+
+        // read the result, in a byte array containing 2 ints
+        // (id, size)
+        byte[] result = new byte[8];
+        AdbHelper.read(mChannel, result, -1 /* full length */, timeOut);
+
+        if (!checkResult(result, ID_OKAY)) {
+            throw new SyncException(SyncError.TRANSFER_PROTOCOL_ERROR,
+                readErrorMessage(result, timeOut));
         }
     }
 

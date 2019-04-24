@@ -1,6 +1,8 @@
 package org.fesaid.tools.ddmlib.logcat;
 
 import com.android.annotations.NonNull;
+import java.util.ArrayList;
+import java.util.List;
 import org.fesaid.tools.ddmlib.Log.LogLevel;
 
 /**
@@ -15,7 +17,7 @@ public final class LogCatMessage {
     private final LogCatHeader mHeader;
 
     @NonNull
-    private final String mMessage;
+    private final List<String> mMessage = new ArrayList<>();
 
     /**
      * @deprecated Create a {@link LogCatHeader} separately and call {@link
@@ -34,7 +36,7 @@ public final class LogCatMessage {
      */
     public LogCatMessage(@NonNull LogCatHeader header, @NonNull String msg) {
         mHeader = header;
-        mMessage = msg;
+        mMessage.add(msg);
     }
 
     /**
@@ -52,7 +54,7 @@ public final class LogCatMessage {
     }
 
     @NonNull
-    public String getMessage() {
+    public List<String> getMessage() {
         return mMessage;
     }
 

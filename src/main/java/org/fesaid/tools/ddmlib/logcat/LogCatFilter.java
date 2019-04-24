@@ -205,10 +205,13 @@ public final class LogCatFilter {
         }
 
         if (mCheckText) {
-            Matcher matcher = mTextPattern.matcher(m.getMessage());
-            if (!matcher.find()) {
-                return false;
+            for (String line: m.getMessage()) {
+                Matcher matcher = mTextPattern.matcher(line);
+                if (matcher.find()) {
+                    return true;
+                }
             }
+            return false;
         }
 
         return true;

@@ -6,7 +6,7 @@
 
     <groupId>org.fesaid.tools</groupId>
     <artifactId>ddmlib</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0</version>
     <name>netty ddmlib</name>
     <description>Library providing APIs to talk to Android devices based on netty</description>
 
@@ -23,6 +23,12 @@
             <artifactId>common</artifactId>
             <version>26.4.0</version>
             <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.6</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>net.sf.kxml</groupId>

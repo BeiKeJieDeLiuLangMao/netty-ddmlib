@@ -46,6 +46,7 @@ public class LogCatMessageParser {
 
     @Nullable
     LogCatHeader mPrevHeader;
+    private LogCatMessage previousMessage;
 
     /**
      * Parse a header line into a {@link LogCatHeader} object, or {@code null} if the input line
@@ -166,7 +167,17 @@ public class LogCatMessageParser {
                     // old logs where some earlier lines have been truncated.
                     continue;
                 }
-                messages.add(new LogCatMessage(mPrevHeader, line));
+                if (previousMessage == null) {
+                    previousMessage = new LogCatMessage(mPrevHeader, line);
+                } else {
+                    if (previousMessage.getHeader().equals(mPrevHeader)) {
+                        previousMessage.getMessage().add(line);
+                    } else {
+                        messages.add(previousMessage);
+                        previousMessage = null;
+                    }
+                }
+
             }
         }
 
