@@ -658,28 +658,16 @@ final class Device implements IDevice {
     }
 
     @Override
-    public void removeForward(int localPort, int remotePort)
-        throws TimeoutException, AdbCommandRejectedException, IOException {
-        AdbHelper.removeForward(AndroidDebugBridge.getSocketAddress(), this,
-            String.format("tcp:%d", localPort),
-            String.format("tcp:%d", remotePort));
-    }
-
-    @Override
-    public void removeForward(int localPort, String remoteSocketName,
-        DeviceUnixSocketNamespace namespace) throws TimeoutException,
+    public void removeForward(int localPort) throws TimeoutException,
         AdbCommandRejectedException, IOException {
         AdbHelper.removeForward(AndroidDebugBridge.getSocketAddress(), this,
-            String.format("tcp:%d", localPort),
-            String.format("%s:%s", namespace.getType(), remoteSocketName));
+            String.format("tcp:%d", localPort));
     }
 
     @Override
-    public void removeForward(String unixSocket, String remoteSocketName,
-        DeviceUnixSocketNamespace namespace) throws TimeoutException, AdbCommandRejectedException, IOException {
+    public void removeForward(String unixSocket) throws TimeoutException, AdbCommandRejectedException, IOException {
         AdbHelper.removeForward(AndroidDebugBridge.getSocketAddress(), this,
-            String.format("localfilesystem:%s", unixSocket),
-            String.format("%s:%s", namespace.getType(), remoteSocketName));
+            String.format("localfilesystem:%s", unixSocket));
     }
 
     Device(ClientTracker clientTracer, String serialNumber, DeviceState deviceState) {

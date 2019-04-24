@@ -449,40 +449,22 @@ public interface IDevice extends IShellEnabledDevice {
      * Removes a port forwarding between a local and a remote port.
      *
      * @param localPort the local port to forward
-     * @param remotePort the remote port.
      * @throws TimeoutException in case of timeout on the connection.
      * @throws AdbCommandRejectedException if adb rejects the command
      * @throws IOException in case of I/O error on the connection.
      */
-    void removeForward(int localPort, int remotePort)
-            throws TimeoutException, AdbCommandRejectedException, IOException;
-
-    /**
-     * Removes an existing port forwarding between a local and a remote port.
-     *
-     * @param localPort the local port to forward
-     * @param remoteSocketName the remote unix domain socket name.
-     * @param namespace namespace in which the unix domain socket was created
-     * @throws TimeoutException in case of timeout on the connection.
-     * @throws AdbCommandRejectedException if adb rejects the command
-     * @throws IOException in case of I/O error on the connection.
-     */
-    void removeForward(int localPort, String remoteSocketName,
-                       DeviceUnixSocketNamespace namespace)
+    void removeForward(int localPort)
             throws TimeoutException, AdbCommandRejectedException, IOException;
 
     /**
      * Removes an existing port forwarding between a local and a remote port.
      *
      * @param unixSocket the local unix socket to forward
-     * @param remoteSocketName the remote unix domain socket name.
-     * @param namespace namespace in which the unix domain socket was created
      * @throws TimeoutException in case of timeout on the connection.
      * @throws AdbCommandRejectedException if adb rejects the command
      * @throws IOException in case of I/O error on the connection.
      */
-    void removeForward(String unixSocket, String remoteSocketName,
-        DeviceUnixSocketNamespace namespace)
+    void removeForward(String unixSocket)
         throws TimeoutException, AdbCommandRejectedException, IOException;
 
     /**
@@ -655,7 +637,7 @@ public interface IDevice extends IShellEnabledDevice {
      * Installs an Android application made of several APK files sitting locally on the device with
      * default timeout
      *
-     * @param apks list of apk file paths on the device to install
+     * @param remoteApks list of apk file paths on the device to install
      * @param reinstall set to <code>true</code> if re-install of app should be performed
      * @param installOptions optional extra arguments to pass. See 'adb shell pm install --help' for
      *     available options.

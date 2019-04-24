@@ -2,8 +2,6 @@ package org.fesaid.tools.ddmlib;
 
 import com.android.annotations.NonNull;
 import com.android.annotations.Nullable;
-import org.fesaid.tools.ddmlib.log.LogReceiver;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
@@ -13,6 +11,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
+import org.fesaid.tools.ddmlib.log.LogReceiver;
 
 /**
  * Helper class to handle requests and connections to adb.
@@ -21,12 +20,15 @@ import java.util.concurrent.TimeUnit;
  * <p>This currently uses spin-wait non-blocking I/O. A Selector would be more efficient,
  * but seems like overkill for what we're doing here.
  */
-final class AdbHelper {
+@SuppressWarnings("WeakerAccess") final class AdbHelper {
 
     // public static final long kOkay = 0x59414b4fL;
     // public static final long kFail = 0x4c494146L;
 
-    static final int WAIT_TIME = 5; // spin-wait sleep, in ms
+    /**
+     * spin-wait sleep, in ms
+     */
+    private static final int WAIT_TIME = 5;
 
     static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
 
@@ -37,147 +39,124 @@ final class AdbHelper {
     /**
      * Response from ADB.
      */
+    @SuppressWarnings("WeakerAccess")
     static class AdbResponse {
         public AdbResponse() {
             message = "";
         }
 
-        public boolean okay; // first 4 bytes in response were "OKAY"?
+        /**
+         * first 4 bytes in response were "OKAY"?
+         */
+        public boolean okay;
 
-        public String message; // diagnostic string if #okay is false
+        /**
+         * diagnostic string if #okay is false
+         */
+        public String message;
     }
 
     /**
-     * Create and connect a new pass-through socket, from the host to a port on
-     * the device.
+     * Create and connect a new pass-through socket, from the host to a port on the device.
      *
-     * @param adbSockAddr
-     * @param device the device to connect to. Can be null in which case the connection will be
-     * to the first available device.
+     * @param adbSockAddr adb socket address
+     * @param device the device to connect to. Can be null in which case the connection will be to the first available
+     * device.
      * @param devicePort the port we're opening
      * @throws TimeoutException in case of timeout on the connection.
      * @throws IOException in case of I/O error on the connection.
      * @throws AdbCommandRejectedException if adb rejects the command
      */
     public static SocketChannel open(InetSocketAddress adbSockAddr,
-            Device device, int devicePort) throws IOException, TimeoutException, AdbCommandRejectedException {
-
+        Device device, int devicePort) throws IOException, TimeoutException, AdbCommandRejectedException {
         SocketChannel adbChan = SocketChannel.open(adbSockAddr);
         try {
             adbChan.socket().setTcpNoDelay(true);
             adbChan.configureBlocking(false);
-
             // if the device is not -1, then we first tell adb we're looking to
             // talk to a specific device
             setDevice(adbChan, device);
-
             byte[] req = createAdbForwardRequest(null, devicePort);
-            // Log.hexDump(req);
-
             write(adbChan, req);
-
             AdbResponse resp = readAdbResponse(adbChan, false);
             if (!resp.okay) {
                 throw new AdbCommandRejectedException(resp.message);
             }
-
             adbChan.configureBlocking(true);
-        } catch (TimeoutException e) {
-            adbChan.close();
-            throw e;
-        } catch (IOException e) {
-            adbChan.close();
-            throw e;
-        } catch (AdbCommandRejectedException e) {
+        } catch (TimeoutException | IOException | AdbCommandRejectedException e) {
             adbChan.close();
             throw e;
         }
-
         return adbChan;
     }
 
     /**
-     * Creates and connects a new pass-through socket, from the host to a port on
-     * the device.
+     * Creates and connects a new pass-through socket, from the host to a port on the device.
      *
-     * @param adbSockAddr
-     * @param device the device to connect to. Can be null in which case the connection will be
-     * to the first available device.
+     * @param adbSockAddr adb socket address
+     * @param device the device to connect to. Can be null in which case the connection will be to the first available
+     * device.
      * @param pid the process pid to connect to.
      * @throws TimeoutException in case of timeout on the connection.
      * @throws AdbCommandRejectedException if adb rejects the command
      * @throws IOException in case of I/O error on the connection.
      */
     public static SocketChannel createPassThroughConnection(InetSocketAddress adbSockAddr,
-            Device device, int pid) throws TimeoutException, AdbCommandRejectedException, IOException {
+        Device device, int pid) throws TimeoutException, AdbCommandRejectedException, IOException {
 
         SocketChannel adbChan = SocketChannel.open(adbSockAddr);
         try {
             adbChan.socket().setTcpNoDelay(true);
             adbChan.configureBlocking(false);
-
             // if the device is not -1, then we first tell adb we're looking to
             // talk to a specific device
             setDevice(adbChan, device);
-
             byte[] req = createJdwpForwardRequest(pid);
-            // Log.hexDump(req);
-
             write(adbChan, req);
-
             AdbResponse resp = readAdbResponse(adbChan, false /* readDiagString */);
             if (!resp.okay) {
                 throw new AdbCommandRejectedException(resp.message);
             }
-
             adbChan.configureBlocking(true);
-        } catch (TimeoutException e) {
-            adbChan.close();
-            throw e;
-        } catch (IOException e) {
-            adbChan.close();
-            throw e;
-        } catch (AdbCommandRejectedException e) {
+        } catch (TimeoutException | AdbCommandRejectedException | IOException e) {
             adbChan.close();
             throw e;
         }
-
         return adbChan;
     }
 
     /**
-     * Creates a port forwarding request for adb. This returns an array
-     * containing "####tcp:{port}:{addStr}".
+     * Creates a port forwarding request for adb. This returns an array containing "####tcp:{port}:{addStr}".
+     *
      * @param addrStr the host. Can be null.
      * @param port the port on the device. This does not need to be numeric.
      */
     private static byte[] createAdbForwardRequest(String addrStr, int port) {
         String reqStr;
-
-        if (addrStr == null)
+        if (addrStr == null) {
             reqStr = "tcp:" + port;
-        else
+        } else {
             reqStr = "tcp:" + port + ":" + addrStr;
+        }
         return formAdbRequest(reqStr);
     }
 
     /**
-     * Creates a port forwarding request to a jdwp process. This returns an array
-     * containing "####jwdp:{pid}".
+     * Creates a port forwarding request to a jdwp process. This returns an array containing "####jwdp:{pid}".
+     *
      * @param pid the jdwp process pid on the device.
      */
     private static byte[] createJdwpForwardRequest(int pid) {
-        String reqStr = String.format("jdwp:%1$d", pid); //$NON-NLS-1$
+        String reqStr = String.format("jdwp:%1$d", pid);
         return formAdbRequest(reqStr);
     }
 
     /**
-     * Create an ASCII string preceded by four hex digits. The opening "####"
-     * is the length of the rest of the string, encoded as ASCII hex (case
-     * doesn't matter).
+     * Create an ASCII string preceded by four hex digits. The opening "####" is the length of the rest of the string,
+     * encoded as ASCII hex (case doesn't matter).
      */
     public static byte[] formAdbRequest(String req) {
-        String resultStr = String.format("%04X%s", req.length(), req); //$NON-NLS-1$
+        String resultStr = String.format("%04X%s", req.length(), req);
         byte[] result = resultStr.getBytes(DEFAULT_CHARSET);
         assert result.length == req.length() + 4;
         return result;
@@ -185,15 +164,15 @@ final class AdbHelper {
 
     /**
      * Reads the response from ADB after a command.
+     *
      * @param chan The socket channel that is connected to adb.
-     * @param readDiagString If true, we're expecting an OKAY response to be
-     *      followed by a diagnostic string. Otherwise, we only expect the
-     *      diagnostic string to follow a FAIL.
+     * @param readDiagString If true, we're expecting an OKAY response to be followed by a diagnostic string. Otherwise,
+     * we only expect the diagnostic string to follow a FAIL.
      * @throws TimeoutException in case of timeout on the connection.
      * @throws IOException in case of I/O error on the connection.
      */
     static AdbResponse readAdbResponse(SocketChannel chan, boolean readDiagString)
-            throws TimeoutException, IOException {
+        throws TimeoutException, IOException {
         AdbResponse resp = new AdbResponse();
 
         byte[] reply = new byte[4];
@@ -202,13 +181,13 @@ final class AdbHelper {
         if (isOkay(reply)) {
             resp.okay = true;
         } else {
-            readDiagString = true; // look for a reason after the FAIL
+            // look for a reason after the FAIL
+            readDiagString = true;
             resp.okay = false;
         }
 
         try {
             // not a loop -- use "while" so we can use "break"
-            //noinspection LoopConditionNotUpdatedInsideLoop
             while (readDiagString) {
                 // length string is in next 4 bytes
                 byte[] lenBuf = new byte[4];
@@ -221,8 +200,8 @@ final class AdbHelper {
                     len = Integer.parseInt(lenStr, 16);
                 } catch (NumberFormatException nfe) {
                     Log.w("ddms", "Expected digits, got '" + lenStr + "': "
-                            + lenBuf[0] + " " + lenBuf[1] + " " + lenBuf[2] + " "
-                            + lenBuf[3]);
+                        + lenBuf[0] + " " + lenBuf[1] + " " + lenBuf[2] + " "
+                        + lenBuf[3]);
                     Log.w("ddms", "reply was " + replyToString(reply));
                     break;
                 }
@@ -232,7 +211,7 @@ final class AdbHelper {
 
                 resp.message = replyToString(msg);
                 Log.v("ddms", "Got reply '" + replyToString(reply) + "', diag='"
-                        + resp.message + "'");
+                    + resp.message + "'");
 
                 break;
             }
@@ -245,90 +224,69 @@ final class AdbHelper {
     }
 
     /**
-     * Retrieve the frame buffer from the device with the given timeout. A timeout of 0 indicates
-     * that it will wait forever.
+     * Retrieve the frame buffer from the device with the given timeout. A timeout of 0 indicates that it will wait
+     * forever.
      *
      * @throws TimeoutException in case of timeout on the connection.
      * @throws AdbCommandRejectedException if adb rejects the command
      * @throws IOException in case of I/O error on the connection.
      */
     static RawImage getFrameBuffer(InetSocketAddress adbSockAddr, Device device, long timeout, TimeUnit unit)
-            throws TimeoutException, AdbCommandRejectedException, IOException {
-
+        throws TimeoutException, AdbCommandRejectedException, IOException {
         RawImage imageParams = new RawImage();
-        byte[] request = formAdbRequest("framebuffer:"); //$NON-NLS-1$
+        byte[] request = formAdbRequest("framebuffer:");
         byte[] nudge = {
             0
         };
         byte[] reply;
-
-        SocketChannel adbChan = null;
-        try {
-            adbChan = SocketChannel.open(adbSockAddr);
+        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
             adbChan.configureBlocking(false);
-
             // if the device is not -1, then we first tell adb we're looking to talk
             // to a specific device
             setDevice(adbChan, device);
-
             write(adbChan, request);
-
-            AdbResponse resp = readAdbResponse(adbChan, false /* readDiagString */);
+            AdbResponse resp = readAdbResponse(adbChan, false);
             if (!resp.okay) {
                 throw new AdbCommandRejectedException(resp.message);
             }
-
             // first the protocol version.
             reply = new byte[4];
             read(adbChan, reply);
-
             ByteBuffer buf = ByteBuffer.wrap(reply);
             buf.order(ByteOrder.LITTLE_ENDIAN);
-
             int version = buf.getInt();
-
             // get the header size (this is a count of int)
             int headerSize = RawImage.getHeaderSize(version);
-
             // read the header
             reply = new byte[headerSize * 4];
             read(adbChan, reply);
-
             buf = ByteBuffer.wrap(reply);
             buf.order(ByteOrder.LITTLE_ENDIAN);
-
             // fill the RawImage with the header
             if (!imageParams.readHeader(version, buf)) {
                 Log.e("Screenshot", "Unsupported protocol: " + version);
                 return null;
             }
-
             Log.d("ddms", "image params: bpp=" + imageParams.bpp + ", size="
-                    + imageParams.size + ", width=" + imageParams.width
-                    + ", height=" + imageParams.height);
+                + imageParams.size + ", width=" + imageParams.width
+                + ", height=" + imageParams.height);
 
             write(adbChan, nudge);
-
             reply = new byte[imageParams.size];
             read(adbChan, reply, imageParams.size, unit.toMillis(timeout));
-
             imageParams.data = reply;
-        } finally {
-            if (adbChan != null) {
-                adbChan.close();
-            }
         }
-
         return imageParams;
     }
 
     /**
-     * @deprecated Use {@link #executeRemoteCommand(InetSocketAddress, String, IDevice, IShellOutputReceiver, long, TimeUnit)}.
+     * @deprecated Use {@link #executeRemoteCommand(InetSocketAddress, String, IDevice, IShellOutputReceiver, long,
+     * TimeUnit)}.
      */
     @Deprecated
     static void executeRemoteCommand(InetSocketAddress adbSockAddr,
-            String command, IDevice device, IShellOutputReceiver rcvr, int maxTimeToOutputResponse)
-            throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException {
+        String command, IDevice device, IShellOutputReceiver rcvr, int maxTimeToOutputResponse)
+        throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException {
         executeRemoteCommand(adbSockAddr, command, device, rcvr, maxTimeToOutputResponse, TimeUnit.MILLISECONDS);
     }
 
@@ -339,71 +297,65 @@ final class AdbHelper {
      * @param adbSockAddr the {@link InetSocketAddress} to adb.
      * @param command the shell command to execute
      * @param device the {@link IDevice} on which to execute the command.
-     * @param rcvr the {@link IShellOutputReceiver} that will receives the output of the shell
-     *     command
-     * @param maxTimeout max time for the command to return. A value of 0 means no max timeout will
-     *     be applied.
-     * @param maxTimeToOutputResponse max time between command output. If more time passes between
-     *     command output, the method will throw {@link ShellCommandUnresponsiveException}. A value
-     *     of 0 means the method will wait forever for command output and never throw.
-     * @param maxTimeUnits Units for non-zero {@code maxTimeout} and {@code maxTimeToOutputResponse}
-     *     values.
+     * @param rcvr the {@link IShellOutputReceiver} that will receives the output of the shell command
+     * @param maxTimeout max time for the command to return. A value of 0 means no max timeout will be applied.
+     * @param maxTimeToOutputResponse max time between command output. If more time passes between command output, the
+     * method will throw {@link ShellCommandUnresponsiveException}. A value of 0 means the method will wait forever for
+     * command output and never throw.
+     * @param maxTimeUnits Units for non-zero {@code maxTimeout} and {@code maxTimeToOutputResponse} values.
      * @throws TimeoutException in case of timeout on the connection when sending the command.
      * @throws AdbCommandRejectedException if adb rejects the command
-     * @throws ShellCommandUnresponsiveException in case the shell command doesn't send any output
-     *     for a period longer than <var>maxTimeToOutputResponse</var>.
+     * @throws ShellCommandUnresponsiveException in case the shell command doesn't send any output for a period longer
+     * than <var>maxTimeToOutputResponse</var>.
      * @throws IOException in case of I/O error on the connection.
      * @see DdmPreferences#getTimeOut()
      */
     static void executeRemoteCommand(
-            InetSocketAddress adbSockAddr,
-            String command,
-            IDevice device,
-            IShellOutputReceiver rcvr,
-            long maxTimeout,
-            long maxTimeToOutputResponse,
-            TimeUnit maxTimeUnits)
-            throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
-                    IOException {
+        InetSocketAddress adbSockAddr,
+        String command,
+        IDevice device,
+        IShellOutputReceiver rcvr,
+        long maxTimeout,
+        long maxTimeToOutputResponse,
+        TimeUnit maxTimeUnits)
+        throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
+        IOException {
         executeRemoteCommand(
-                adbSockAddr,
-                AdbService.SHELL,
-                command,
-                device,
-                rcvr,
-                maxTimeout,
-                maxTimeToOutputResponse,
-                maxTimeUnits,
-                null /* inputStream */);
+            adbSockAddr,
+            AdbService.SHELL,
+            command,
+            device,
+            rcvr,
+            maxTimeout,
+            maxTimeToOutputResponse,
+            maxTimeUnits,
+            null);
     }
 
     /**
-     * Executes a shell command on the device and retrieve the output. The output is
-     * handed to <var>rcvr</var> as it arrives.
+     * Executes a shell command on the device and retrieve the output. The output is handed to <var>rcvr</var> as it
+     * arrives.
      *
      * @param adbSockAddr the {@link InetSocketAddress} to adb.
      * @param command the shell command to execute
      * @param device the {@link IDevice} on which to execute the command.
-     * @param rcvr the {@link IShellOutputReceiver} that will receives the output of the shell
-     *            command
-     * @param maxTimeToOutputResponse max time between command output. If more time passes
-     *            between command output, the method will throw
-     *            {@link ShellCommandUnresponsiveException}. A value of 0 means the method will
-     *            wait forever for command output and never throw.
+     * @param rcvr the {@link IShellOutputReceiver} that will receives the output of the shell command
+     * @param maxTimeToOutputResponse max time between command output. If more time passes between command output, the
+     * method will throw {@link ShellCommandUnresponsiveException}. A value of 0 means the method will wait forever for
+     * command output and never throw.
      * @param maxTimeUnits Units for non-zero {@code maxTimeToOutputResponse} values.
      * @throws TimeoutException in case of timeout on the connection when sending the command.
      * @throws AdbCommandRejectedException if adb rejects the command
-     * @throws ShellCommandUnresponsiveException in case the shell command doesn't send any output
-     *            for a period longer than <var>maxTimeToOutputResponse</var>.
+     * @throws ShellCommandUnresponsiveException in case the shell command doesn't send any output for a period longer
+     * than <var>maxTimeToOutputResponse</var>.
      * @throws IOException in case of I/O error on the connection.
-     *
      * @see DdmPreferences#getTimeOut()
      */
     static void executeRemoteCommand(InetSocketAddress adbSockAddr,
-            String command, IDevice device, IShellOutputReceiver rcvr, long maxTimeToOutputResponse, TimeUnit maxTimeUnits)
-            throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException {
+        String command, IDevice device, IShellOutputReceiver rcvr, long maxTimeToOutputResponse, TimeUnit maxTimeUnits)
+        throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException {
         executeRemoteCommand(adbSockAddr, AdbService.SHELL, command, device, rcvr, maxTimeToOutputResponse,
-                maxTimeUnits, null /* inputStream */);
+            maxTimeUnits, null);
     }
 
     /**
@@ -427,39 +379,36 @@ final class AdbHelper {
      * adbService parameter.
      *
      * @param adbSockAddr the {@link InetSocketAddress} to adb.
-     * @param adbService the {@link AdbService} to use to run the
-     *     command.
+     * @param adbService the {@link AdbService} to use to run the command.
      * @param command the shell command to execute
      * @param device the {@link IDevice} on which to execute the command.
-     * @param rcvr the {@link IShellOutputReceiver} that will receives the output of the shell
-     *     command
+     * @param rcvr the {@link IShellOutputReceiver} that will receives the output of the shell command
      * @param maxTimeout max timeout for the full command to execute. A value of 0 means no timeout.
-     * @param maxTimeToOutputResponse max time between command output. If more time passes between
-     *     command output, the method will throw {@link ShellCommandUnresponsiveException}. A value
-     *     of 0 means the method will wait forever for command output and never throw.
-     * @param maxTimeUnits Units for non-zero {@code maxTimeout} and {@code maxTimeToOutputResponse}
-     *     values.
-     * @param is a optional {@link InputStream} to be streamed up after invoking the command and
-     *     before retrieving the response.
+     * @param maxTimeToOutputResponse max time between command output. If more time passes between command output, the
+     * method will throw {@link ShellCommandUnresponsiveException}. A value of 0 means the method will wait forever for
+     * command output and never throw.
+     * @param maxTimeUnits Units for non-zero {@code maxTimeout} and {@code maxTimeToOutputResponse} values.
+     * @param is a optional {@link InputStream} to be streamed up after invoking the command and before retrieving the
+     * response.
      * @throws TimeoutException in case of timeout on the connection when sending the command.
      * @throws AdbCommandRejectedException if adb rejects the command
-     * @throws ShellCommandUnresponsiveException in case the shell command doesn't send any output
-     *     for a period longer than <var>maxTimeToOutputResponse</var>.
+     * @throws ShellCommandUnresponsiveException in case the shell command doesn't send any output for a period longer
+     * than <var>maxTimeToOutputResponse</var>.
      * @throws IOException in case of I/O error on the connection.
      * @see DdmPreferences#getTimeOut()
      */
     static void executeRemoteCommand(
-            InetSocketAddress adbSockAddr,
-            AdbService adbService,
-            String command,
-            IDevice device,
-            IShellOutputReceiver rcvr,
-            long maxTimeout,
-            long maxTimeToOutputResponse,
-            TimeUnit maxTimeUnits,
-            @Nullable InputStream is)
-            throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
-                    IOException {
+        InetSocketAddress adbSockAddr,
+        AdbService adbService,
+        String command,
+        IDevice device,
+        @Nullable IShellOutputReceiver rcvr,
+        long maxTimeout,
+        long maxTimeToOutputResponse,
+        TimeUnit maxTimeUnits,
+        @Nullable InputStream is)
+        throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
+        IOException {
 
         long maxTimeToOutputMs = 0;
         if (maxTimeToOutputResponse > 0) {
@@ -488,10 +437,10 @@ final class AdbHelper {
             // talk to a specific device
             setDevice(adbChan, device);
 
-            byte[] request = formAdbRequest(adbService.name().toLowerCase() + ":" + command); //$NON-NLS-1$
+            byte[] request = formAdbRequest(adbService.name().toLowerCase() + ":" + command);
             write(adbChan, request);
 
-            AdbResponse resp = readAdbResponse(adbChan, false /* readDiagString */);
+            AdbResponse resp = readAdbResponse(adbChan, false);
             if (!resp.okay) {
                 Log.e("ddms", "ADB rejected shell command (" + command + "): " + resp.message);
                 throw new AdbCommandRejectedException(resp.message);
@@ -510,7 +459,7 @@ final class AdbHelper {
                     }
                     if (written != read) {
                         Log.e("ddms",
-                                "ADB write inconsistency, wrote " + written + "expected " + read);
+                            "ADB write inconsistency, wrote " + written + "expected " + read);
                         throw new AdbCommandRejectedException("write failed");
                     }
                 }
@@ -532,7 +481,7 @@ final class AdbHelper {
                     // we're at the end, we flush the output
                     rcvr.flush();
                     Log.v("ddms", "execute '" + command + "' on '" + device + "' : EOF hit. Read: "
-                            + count);
+                        + count);
                     break;
                 } else if (count == 0) {
                     try {
@@ -542,8 +491,7 @@ final class AdbHelper {
                             throw new ShellCommandUnresponsiveException();
                         }
                         Thread.sleep(wait);
-                    }
-                    catch (InterruptedException e) {
+                    } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         // Throw a timeout exception in place of interrupted exception to avoid API changes.
                         throw new TimeoutException("executeRemoteCommand interrupted with immediate timeout via interruption.");
@@ -561,8 +509,8 @@ final class AdbHelper {
                 // if the overall timeout exists and is exceeded, we throw timeout exception.
                 if (maxTimeoutMs > 0 && System.currentTimeMillis() - startTime > maxTimeoutMs) {
                     throw new TimeoutException(
-                            String.format(
-                                    "executeRemoteCommand timed out after %sms", maxTimeoutMs));
+                        String.format(
+                            "executeRemoteCommand timed out after %sms", maxTimeoutMs));
                 }
             }
         } finally {
@@ -579,52 +527,50 @@ final class AdbHelper {
      * adbService parameter.
      *
      * @param adbSockAddr the {@link InetSocketAddress} to adb.
-     * @param adbService the {@link AdbService} to use to run the
-     *     command.
+     * @param adbService the {@link AdbService} to use to run the command.
      * @param command the shell command to execute
      * @param device the {@link IDevice} on which to execute the command.
-     * @param rcvr the {@link IShellOutputReceiver} that will receives the output of the shell
-     *     command
-     * @param maxTimeToOutputResponse max time between command output. If more time passes between
-     *     command output, the method will throw {@link ShellCommandUnresponsiveException}. A value
-     *     of 0 means the method will wait forever for command output and never throw.
+     * @param rcvr the {@link IShellOutputReceiver} that will receives the output of the shell command
+     * @param maxTimeToOutputResponse max time between command output. If more time passes between command output, the
+     * method will throw {@link ShellCommandUnresponsiveException}. A value of 0 means the method will wait forever for
+     * command output and never throw.
      * @param maxTimeUnits Units for non-zero {@code maxTimeToOutputResponse} values.
-     * @param is a optional {@link InputStream} to be streamed up after invoking the command and
-     *     before retrieving the response.
+     * @param is a optional {@link InputStream} to be streamed up after invoking the command and before retrieving the
+     * response.
      * @throws TimeoutException in case of timeout on the connection when sending the command.
      * @throws AdbCommandRejectedException if adb rejects the command
-     * @throws ShellCommandUnresponsiveException in case the shell command doesn't send any output
-     *     for a period longer than <var>maxTimeToOutputResponse</var>.
+     * @throws ShellCommandUnresponsiveException in case the shell command doesn't send any output for a period longer
+     * than <var>maxTimeToOutputResponse</var>.
      * @throws IOException in case of I/O error on the connection.
      * @see DdmPreferences#getTimeOut()
      */
     static void executeRemoteCommand(
-            InetSocketAddress adbSockAddr,
-            AdbService adbService,
-            String command,
-            IDevice device,
-            IShellOutputReceiver rcvr,
-            long maxTimeToOutputResponse,
-            TimeUnit maxTimeUnits,
-            @Nullable InputStream is)
-            throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
-                    IOException {
+        InetSocketAddress adbSockAddr,
+        AdbService adbService,
+        String command,
+        IDevice device,
+        IShellOutputReceiver rcvr,
+        long maxTimeToOutputResponse,
+        TimeUnit maxTimeUnits,
+        @Nullable InputStream is)
+        throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
+        IOException {
         executeRemoteCommand(
-                adbSockAddr,
-                adbService,
-                command,
-                device,
-                rcvr,
-                0L,
-                maxTimeToOutputResponse,
-                maxTimeUnits,
-                is);
+            adbSockAddr,
+            adbService,
+            command,
+            device,
+            rcvr,
+            0L,
+            maxTimeToOutputResponse,
+            maxTimeUnits,
+            is);
     }
 
     /**
-     * Runs the Event log service on the {@link Device}, and provides its output to the
-     * {@link LogReceiver}.
+     * Runs the Event log service on the {@link Device}, and provides its output to the {@link LogReceiver}.
      * <p>This call is blocking until {@link LogReceiver#isCancelled()} returns true.
+     *
      * @param adbSockAddr the socket address to connect to adb
      * @param device the Device on which to run the service
      * @param rcvr the {@link LogReceiver} to receive the log output
@@ -633,13 +579,14 @@ final class AdbHelper {
      * @throws IOException in case of I/O error on the connection.
      */
     public static void runEventLogService(InetSocketAddress adbSockAddr, Device device,
-            LogReceiver rcvr) throws TimeoutException, AdbCommandRejectedException, IOException {
-        runLogService(adbSockAddr, device, "events", rcvr); //$NON-NLS-1$
+        LogReceiver rcvr) throws TimeoutException, AdbCommandRejectedException, IOException {
+        runLogService(adbSockAddr, device, "events", rcvr);
     }
 
     /**
      * Runs a log service on the {@link Device}, and provides its output to the {@link LogReceiver}.
      * <p>This call is blocking until {@link LogReceiver#isCancelled()} returns true.
+     *
      * @param adbSockAddr the socket address to connect to adb
      * @param device the Device on which to run the service
      * @param logName the name of the log file to output
@@ -649,11 +596,8 @@ final class AdbHelper {
      * @throws IOException in case of I/O error on the connection.
      */
     public static void runLogService(InetSocketAddress adbSockAddr, Device device, String logName,
-            LogReceiver rcvr) throws TimeoutException, AdbCommandRejectedException, IOException {
-        SocketChannel adbChan = null;
-
-        try {
-            adbChan = SocketChannel.open(adbSockAddr);
+        LogReceiver rcvr) throws TimeoutException, AdbCommandRejectedException, IOException {
+        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
             adbChan.configureBlocking(false);
 
             // if the device is not -1, then we first tell adb we're looking to talk
@@ -663,28 +607,24 @@ final class AdbHelper {
             byte[] request = formAdbRequest("log:" + logName);
             write(adbChan, request);
 
-            AdbResponse resp = readAdbResponse(adbChan, false /* readDiagString */);
+            AdbResponse resp = readAdbResponse(adbChan, false);
             if (!resp.okay) {
                 throw new AdbCommandRejectedException(resp.message);
             }
-
             byte[] data = new byte[16384];
             ByteBuffer buf = ByteBuffer.wrap(data);
             while (true) {
                 int count;
-
                 if (rcvr != null && rcvr.isCancelled()) {
                     break;
                 }
-
                 count = adbChan.read(buf);
                 if (count < 0) {
                     break;
                 } else if (count == 0) {
                     try {
                         Thread.sleep(WAIT_TIME * 5);
-                    }
-                    catch (InterruptedException e) {
+                    } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         // Throw a timeout exception in place of interrupted exception to avoid API changes.
                         throw new TimeoutException("runLogService interrupted with immediate timeout via interruption.");
@@ -696,97 +636,62 @@ final class AdbHelper {
                     buf.rewind();
                 }
             }
-        } finally {
-            if (adbChan != null) {
-                adbChan.close();
-            }
         }
     }
 
     /**
      * Creates a port forwarding between a local and a remote port.
+     *
      * @param adbSockAddr the socket address to connect to adb
      * @param device the device on which to do the port forwarding
-     * @param localPortSpec specification of the local port to forward, should be of format
-     *                             tcp:<port number>
-     * @param remotePortSpec specification of the remote port to forward to, one of:
-     *                             tcp:<port>
-     *                             localabstract:<unix domain socket name>
-     *                             localreserved:<unix domain socket name>
-     *                             localfilesystem:<unix domain socket name>
-     *                             dev:<character device name>
-     *                             jdwp:<process pid> (remote only)
+     * @param localPortSpec specification of the local port to forward, should be of format tcp:<port number>
+     * @param remotePortSpec specification of the remote port to forward to, one of: tcp:<port> localabstract:<unix
+     * domain socket name> localreserved:<unix domain socket name> localfilesystem:<unix domain socket name>
+     * dev:<character device name> jdwp:<process pid> (remote only)
      * @throws TimeoutException in case of timeout on the connection.
      * @throws AdbCommandRejectedException if adb rejects the command
      * @throws IOException in case of I/O error on the connection.
      */
     public static void createForward(InetSocketAddress adbSockAddr, Device device,
-            String localPortSpec, String remotePortSpec)
-            throws TimeoutException, AdbCommandRejectedException, IOException {
-
-        SocketChannel adbChan = null;
-        try {
-            adbChan = SocketChannel.open(adbSockAddr);
+        String localPortSpec, String remotePortSpec)
+        throws TimeoutException, AdbCommandRejectedException, IOException {
+        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
             adbChan.configureBlocking(false);
-
             byte[] request = formAdbRequest(String.format(
-                    "host-serial:%1$s:forward:%2$s;%3$s", //$NON-NLS-1$
-                    device.getSerialNumber(), localPortSpec, remotePortSpec));
-
+                "host-serial:%1$s:forward:%2$s;%3$s",
+                device.getSerialNumber(), localPortSpec, remotePortSpec));
             write(adbChan, request);
-
-            AdbResponse resp = readAdbResponse(adbChan, false /* readDiagString */);
+            AdbResponse resp = readAdbResponse(adbChan, false);
             if (!resp.okay) {
                 Log.w("create-forward", "Error creating forward: " + resp.message);
                 throw new AdbCommandRejectedException(resp.message);
-            }
-        } finally {
-            if (adbChan != null) {
-                adbChan.close();
             }
         }
     }
 
     /**
      * Remove a port forwarding between a local and a remote port.
+     *
      * @param adbSockAddr the socket address to connect to adb
      * @param device the device on which to remove the port forwarding
-     * @param localPortSpec specification of the local port that was forwarded, should be of format
-     *                             tcp:<port number>
-     * @param remotePortSpec specification of the remote port forwarded to, one of:
-     *                             tcp:<port>
-     *                             localabstract:<unix domain socket name>
-     *                             localreserved:<unix domain socket name>
-     *                             localfilesystem:<unix domain socket name>
-     *                             dev:<character device name>
-     *                             jdwp:<process pid> (remote only)
+     * @param localPortSpec specification of the local port that was forwarded, should be of format tcp:<port number>
      * @throws TimeoutException in case of timeout on the connection.
      * @throws AdbCommandRejectedException if adb rejects the command
      * @throws IOException in case of I/O error on the connection.
      */
     public static void removeForward(InetSocketAddress adbSockAddr, Device device,
-            String localPortSpec, String remotePortSpec)
-            throws TimeoutException, AdbCommandRejectedException, IOException {
-
-        SocketChannel adbChan = null;
-        try {
-            adbChan = SocketChannel.open(adbSockAddr);
+        String localPortSpec)
+        throws TimeoutException, AdbCommandRejectedException, IOException {
+        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
             adbChan.configureBlocking(false);
-
             byte[] request = formAdbRequest(String.format(
-                    "host-serial:%1$s:killforward:%2$s", //$NON-NLS-1$
-                    device.getSerialNumber(), localPortSpec));
-
+                "host-serial:%1$s:killforward:%2$s",
+                device.getSerialNumber(), localPortSpec));
             write(adbChan, request);
-
-            AdbResponse resp = readAdbResponse(adbChan, false /* readDiagString */);
+            AdbResponse resp = readAdbResponse(adbChan, false);
             if (!resp.okay) {
                 Log.w("remove-forward", "Error creating forward: " + resp.message);
                 throw new AdbCommandRejectedException(resp.message);
-            }
-        } finally {
-            if (adbChan != null) {
-                adbChan.close();
             }
         }
     }
@@ -795,8 +700,8 @@ final class AdbHelper {
      * Checks to see if the first four bytes in "reply" are OKAY.
      */
     static boolean isOkay(byte[] reply) {
-        return reply[0] == (byte)'O' && reply[1] == (byte)'K'
-                && reply[2] == (byte)'A' && reply[3] == (byte)'Y';
+        return reply[0] == (byte) 'O' && reply[1] == (byte) 'K'
+            && reply[2] == (byte) 'A' && reply[3] == (byte) 'Y';
     }
 
     /**
@@ -807,12 +712,11 @@ final class AdbHelper {
     }
 
     /**
-     * Reads from the socket until the array is filled, or no more data is coming (because
-     * the socket closed or the timeout expired).
+     * Reads from the socket until the array is filled, or no more data is coming (because the socket closed or the
+     * timeout expired).
      * <p>This uses the default time out value.
      *
-     * @param chan the opened socket to read from. It must be in non-blocking
-     *      mode for timeouts to work
+     * @param chan the opened socket to read from. It must be in non-blocking mode for timeouts to work
      * @param data the buffer to store the read data into.
      * @throws TimeoutException in case of timeout on the connection.
      * @throws IOException in case of I/O error on the connection.
@@ -822,14 +726,11 @@ final class AdbHelper {
     }
 
     /**
-     * Reads from the socket until the array is filled, the optional length
-     * is reached, or no more data is coming (because the socket closed or the
-     * timeout expired). After "timeout" milliseconds since the
-     * previous successful read, this will return whether or not new data has
-     * been found.
+     * Reads from the socket until the array is filled, the optional length is reached, or no more data is coming
+     * (because the socket closed or the timeout expired). After "timeout" milliseconds since the previous successful
+     * read, this will return whether or not new data has been found.
      *
-     * @param chan the opened socket to read from. It must be in non-blocking
-     *      mode for timeouts to work
+     * @param chan the opened socket to read from. It must be in non-blocking mode for timeouts to work
      * @param data the buffer to store the read data into.
      * @param length the length to read or -1 to fill the data buffer completely
      * @param timeout The timeout value in ms. A timeout of zero means "wait forever".
@@ -854,8 +755,7 @@ final class AdbHelper {
                 try {
                     // non-blocking spin
                     Thread.sleep(WAIT_TIME);
-                }
-                catch (InterruptedException e) {
+                } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     // Throw a timeout exception in place of interrupted exception to avoid API changes.
                     throw new TimeoutException("Read interrupted with immediate timeout via interruption.");
@@ -870,6 +770,7 @@ final class AdbHelper {
     /**
      * Write until all data in "data" is written or the connection fails or times out.
      * <p>This uses the default time out value.
+     *
      * @param chan the opened socket to write to.
      * @param data the buffer to send.
      * @throws TimeoutException in case of timeout on the connection.
@@ -880,9 +781,9 @@ final class AdbHelper {
     }
 
     /**
-     * Write until all data in "data" is written, the optional length is reached,
-     * the timeout expires, or the connection fails. Returns "true" if all
-     * data was written.
+     * Write until all data in "data" is written, the optional length is reached, the timeout expires, or the connection
+     * fails. Returns "true" if all data was written.
+     *
      * @param chan the opened socket to write to.
      * @param data the buffer to send.
      * @param length the length to write or -1 to send the whole buffer.
@@ -893,10 +794,8 @@ final class AdbHelper {
     static void write(SocketChannel chan, byte[] data, int length, int timeout) throws TimeoutException, IOException {
         ByteBuffer buf = ByteBuffer.wrap(data, 0, length != -1 ? length : data.length);
         int numWaits = 0;
-
         while (buf.position() != buf.limit()) {
             int count;
-
             count = chan.write(buf);
             if (count < 0) {
                 Log.d("ddms", "write: channel EOF");
@@ -910,8 +809,7 @@ final class AdbHelper {
                 try {
                     // non-blocking spin
                     Thread.sleep(WAIT_TIME);
-                }
-                catch (InterruptedException e) {
+                } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     // Throw a timeout exception in place of interrupted exception to avoid API changes.
                     throw new TimeoutException("Write interrupted with immediate timeout via interruption.");
@@ -933,19 +831,16 @@ final class AdbHelper {
      * @throws IOException in case of I/O error on the connection.
      */
     static void setDevice(SocketChannel adbChan, IDevice device)
-            throws TimeoutException, AdbCommandRejectedException, IOException {
+        throws TimeoutException, AdbCommandRejectedException, IOException {
         // if the device is not -1, then we first tell adb we're looking to talk
         // to a specific device
         if (device != null) {
-            String msg = "host:transport:" + device.getSerialNumber(); //$NON-NLS-1$
-            byte[] device_query = formAdbRequest(msg);
-
-            write(adbChan, device_query);
-
-            AdbResponse resp = readAdbResponse(adbChan, false /* readDiagString */);
+            String msg = "host:transport:" + device.getSerialNumber();
+            byte[] deviceQuery = formAdbRequest(msg);
+            write(adbChan, deviceQuery);
+            AdbResponse resp = readAdbResponse(adbChan, false);
             if (!resp.okay) {
-                throw new AdbCommandRejectedException(resp.message,
-                        true/*errorDuringDeviceSelection*/);
+                throw new AdbCommandRejectedException(resp.message, true);
             }
         }
     }
@@ -959,66 +854,44 @@ final class AdbHelper {
      * @throws IOException in case of I/O error on the connection.
      */
     public static void reboot(String into, InetSocketAddress adbSockAddr, Device device)
-            throws TimeoutException, AdbCommandRejectedException, IOException {
+        throws TimeoutException, AdbCommandRejectedException, IOException {
         byte[] request;
         if (into == null) {
-            request = formAdbRequest("reboot:"); //$NON-NLS-1$
+            request = formAdbRequest("reboot:");
         } else {
-            request = formAdbRequest("reboot:" + into); //$NON-NLS-1$
+            request = formAdbRequest("reboot:" + into);
         }
-
-        SocketChannel adbChan = null;
-        try {
-            adbChan = SocketChannel.open(adbSockAddr);
+        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
             adbChan.configureBlocking(false);
-
             // if the device is not -1, then we first tell adb we're looking to talk
             // to a specific device
             setDevice(adbChan, device);
-
             write(adbChan, request);
-        } finally {
-            if (adbChan != null) {
-                adbChan.close();
-            }
         }
     }
 
-
     /**
-     * Ask the adb demon to become root on the device.
-     * This may silently fail, and can only succeed on developer builds.
-     * See "adb root" for more information.
-     * If you need to know if succeeded, you can check the result of executeRemoteCommand on 'echo \$USER_ID', if it is 0 then adbd is
-     * running as root.
+     * Ask the adb demon to become root on the device. This may silently fail, and can only succeed on developer builds.
+     * See "adb root" for more information. If you need to know if succeeded, you can check the result of
+     * executeRemoteCommand on 'echo \$USER_ID', if it is 0 then adbd is running as root.
      *
      * @throws TimeoutException in case of timeout on the connection.
      * @throws AdbCommandRejectedException if adb rejects the command
      * @throws IOException in case of I/O error on the connection.
      */
     public static void root(@NonNull InetSocketAddress adbSockAddr, @NonNull Device device)
-      throws TimeoutException, AdbCommandRejectedException, IOException {
-        byte[] request = formAdbRequest("root:"); //$NON-NLS-1$
-        SocketChannel adbChan = null;
-        try {
-            adbChan = SocketChannel.open(adbSockAddr);
+        throws TimeoutException, AdbCommandRejectedException, IOException {
+        byte[] request = formAdbRequest("root:");
+        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
             adbChan.configureBlocking(false);
-
             // if the device is not -1, then we first tell adb we're looking to talk
             // to a specific device
             setDevice(adbChan, device);
-
             write(adbChan, request);
-
             AdbResponse resp = readAdbResponse(adbChan, false /* readDiagString */);
             if (!resp.okay) {
                 Log.w("root", "Error setting root: " + resp.message);
                 throw new AdbCommandRejectedException(resp.message);
-            }
-
-        } finally {
-            if (adbChan != null) {
-                adbChan.close();
             }
         }
     }
