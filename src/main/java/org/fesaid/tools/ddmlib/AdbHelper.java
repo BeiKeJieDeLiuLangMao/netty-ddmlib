@@ -11,7 +11,12 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 import org.fesaid.tools.ddmlib.log.LogReceiver;
+import org.fesaid.tools.ddmlib.netty.AdbConnection;
+import org.fesaid.tools.ddmlib.netty.AdbNettyConfig;
+import org.fesaid.tools.ddmlib.netty.AdbConnector;
+import org.fesaid.tools.ddmlib.netty.AdbRespondHandler;
 
 /**
  * Helper class to handle requests and connections to adb.
@@ -21,6 +26,7 @@ import org.fesaid.tools.ddmlib.log.LogReceiver;
  * but seems like overkill for what we're doing here.
  */
 @SuppressWarnings({"WeakerAccess"})
+@Slf4j
 final class AdbHelper {
 
     // public static final long kOkay = 0x59414b4fL;
@@ -32,9 +38,14 @@ final class AdbHelper {
     private static final int WAIT_TIME = 5;
 
     static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+    static AdbConnector adbConnector;
 
     /** do not instantiate */
     private AdbHelper() {
+    }
+
+    public static void init(AdbNettyConfig config) {
+        adbConnector = new AdbConnector(config);
     }
 
     /**
@@ -593,16 +604,13 @@ final class AdbHelper {
     public static void createForward(InetSocketAddress adbSockAddr, Device device,
         String localPortSpec, String remotePortSpec)
         throws TimeoutException, AdbCommandRejectedException, IOException {
-        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
-            adbChan.configureBlocking(false);
-            byte[] request = formAdbRequest(String.format(
-                "host-serial:%1$s:forward:%2$s;%3$s",
-                device.getSerialNumber(), localPortSpec, remotePortSpec));
-            write(adbChan, request);
-            AdbResponse resp = readAdbResponse(adbChan);
-            if (!resp.okay) {
-                Log.w("create-forward", "Error creating forward: " + resp.message);
-                throw new AdbCommandRejectedException(resp.message);
+        try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())) {
+            AdbRespondHandler respondHandler = adbConnection.sendAndWaitResponse(
+                String.format("host-serial:%1$s:forward:%2$s;%3$s", device.getSerialNumber(), localPortSpec, remotePortSpec),
+                DdmPreferences.getTimeOut(),
+                TimeUnit.MILLISECONDS);
+            if (!respondHandler.getOkay()) {
+                throw new AdbCommandRejectedException(respondHandler.getMessage());
             }
         }
     }
@@ -620,16 +628,13 @@ final class AdbHelper {
     public static void removeForward(InetSocketAddress adbSockAddr, Device device,
         String localPortSpec)
         throws TimeoutException, AdbCommandRejectedException, IOException {
-        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
-            adbChan.configureBlocking(false);
-            byte[] request = formAdbRequest(String.format(
-                "host-serial:%1$s:killforward:%2$s",
-                device.getSerialNumber(), localPortSpec));
-            write(adbChan, request);
-            AdbResponse resp = readAdbResponse(adbChan);
-            if (!resp.okay) {
-                Log.w("remove-forward", "Error creating forward: " + resp.message);
-                throw new AdbCommandRejectedException(resp.message);
+        try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())) {
+            AdbRespondHandler respondHandler = adbConnection.sendAndWaitResponse(
+                String.format("host-serial:%1$s:killforward:%2$s", device.getSerialNumber(), localPortSpec),
+                DdmPreferences.getTimeOut(),
+                TimeUnit.MILLISECONDS);
+            if (!respondHandler.getOkay()) {
+                throw new AdbCommandRejectedException(respondHandler.getMessage());
             }
         }
     }
@@ -768,6 +773,7 @@ final class AdbHelper {
      * @throws AdbCommandRejectedException if adb rejects the command
      * @throws IOException in case of I/O error on the connection.
      */
+    @Deprecated
     static void setDevice(SocketChannel adbChan, IDevice device)
         throws TimeoutException, AdbCommandRejectedException, IOException {
         // if the device is not -1, then we first tell adb we're looking to talk
@@ -784,6 +790,29 @@ final class AdbHelper {
     }
 
     /**
+     * tells adb to talk to a specific device
+     *
+     * @param adbConnection the socket connection to adb
+     * @param device The device to talk to.
+     * @throws TimeoutException in case of timeout on the connection.
+     * @throws AdbCommandRejectedException if adb rejects the command
+     */
+    static void setDevice(AdbConnection adbConnection, IDevice device)
+        throws TimeoutException, AdbCommandRejectedException {
+        // if the device is not -1, then we first tell adb we're looking to talk
+        // to a specific device
+        if (device != null) {
+            AdbRespondHandler adbRespondHandler = adbConnection.sendAndWaitResponse(
+                "host:transport:" + device.getSerialNumber(),
+                DdmPreferences.getTimeOut(),
+                TimeUnit.MILLISECONDS);
+            if (!adbRespondHandler.getOkay()) {
+                throw new AdbCommandRejectedException(adbRespondHandler.getMessage(), true);
+            }
+        }
+    }
+
+    /**
      * Reboot the device.
      *
      * @param into what to reboot into (recovery, bootloader).  Or null to just reboot.
@@ -793,18 +822,15 @@ final class AdbHelper {
      */
     public static void reboot(String into, InetSocketAddress adbSockAddr, Device device)
         throws TimeoutException, AdbCommandRejectedException, IOException {
-        byte[] request;
-        if (into == null) {
-            request = formAdbRequest("reboot:");
-        } else {
-            request = formAdbRequest("reboot:" + into);
-        }
-        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
-            adbChan.configureBlocking(false);
-            // if the device is not -1, then we first tell adb we're looking to talk
-            // to a specific device
-            setDevice(adbChan, device);
-            write(adbChan, request);
+        try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())) {
+            setDevice(adbConnection, device);
+            String message;
+            if (into == null) {
+                message = "reboot:";
+            } else {
+                message = "reboot:" + into;
+            }
+            adbConnection.send(message);
         }
     }
 
@@ -819,17 +845,12 @@ final class AdbHelper {
      */
     public static void root(@NonNull InetSocketAddress adbSockAddr, @NonNull Device device)
         throws TimeoutException, AdbCommandRejectedException, IOException {
-        byte[] request = formAdbRequest("root:");
-        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
-            adbChan.configureBlocking(false);
-            // if the device is not -1, then we first tell adb we're looking to talk
-            // to a specific device
-            setDevice(adbChan, device);
-            write(adbChan, request);
-            AdbResponse resp = readAdbResponse(adbChan);
-            if (!resp.okay) {
-                Log.w("root", "Error setting root: " + resp.message);
-                throw new AdbCommandRejectedException(resp.message);
+        try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())) {
+            setDevice(adbConnection, device);
+            AdbRespondHandler respondHandler = adbConnection.sendAndWaitResponse(
+                "root:", DdmPreferences.getTimeOut(), TimeUnit.MILLISECONDS);
+            if (!respondHandler.getOkay()) {
+                throw new AdbCommandRejectedException(respondHandler.getMessage());
             }
         }
     }

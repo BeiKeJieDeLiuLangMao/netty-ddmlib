@@ -6,29 +6,29 @@ package org.fesaid.tools.ddmlib;
  * applications using the ddmlib to override the default values.
  * <p>Various components of the ddmlib query this class to get their values.
  * <p>Calls to some <code>set##()</code> methods will update the components using the values
- * right away, while other methods will have no effect once {@link AndroidDebugBridge#init(boolean)}
+ * right away, while other methods will have no effect once {@link AndroidDebugBridge#init}
  * has been called.
  * <p>Check the documentation of each method.
  */
 public final class DdmPreferences {
 
     /** Default value for thread update flag upon client connection. */
-    public static final boolean DEFAULT_INITIAL_THREAD_UPDATE = false;
+    private static final boolean DEFAULT_INITIAL_THREAD_UPDATE = false;
     /** Default value for heap update flag upon client connection. */
-    public static final boolean DEFAULT_INITIAL_HEAP_UPDATE = false;
+    private static final boolean DEFAULT_INITIAL_HEAP_UPDATE = false;
     /** Default value for the selected client debug port */
-    public static final int DEFAULT_SELECTED_DEBUG_PORT = 8700;
+    private static final int DEFAULT_SELECTED_DEBUG_PORT = 8700;
     /** Default value for the debug port base */
-    public static final int DEFAULT_DEBUG_PORT_BASE = 8600;
+    private static final int DEFAULT_DEBUG_PORT_BASE = 8600;
     /** Default value for the logcat {@link Log.LogLevel} */
-    public static final Log.LogLevel DEFAULT_LOG_LEVEL = Log.LogLevel.ERROR;
+    private static final Log.LogLevel DEFAULT_LOG_LEVEL = Log.LogLevel.ERROR;
     /** Default timeout values for adb connection (milliseconds) */
-    public static final int DEFAULT_TIMEOUT = 5000; // standard delay, in ms
+    private static final int DEFAULT_TIMEOUT = 5000;
     /** Default profiler buffer size (megabytes) */
-    public static final int DEFAULT_PROFILER_BUFFER_SIZE_MB = 8;
+    private static final int DEFAULT_PROFILER_BUFFER_SIZE_MB = 8;
     /** Default values for the use of the ADBHOST environment variable. */
-    public static final boolean DEFAULT_USE_ADBHOST = false;
-    public static final String DEFAULT_ADBHOST_VALUE = "127.0.0.1";
+    private static final boolean DEFAULT_USE_ADBHOST = false;
+    private static final String DEFAULT_ADBHOST_VALUE = "127.0.0.1";
 
     private static boolean sThreadUpdate = DEFAULT_INITIAL_THREAD_UPDATE;
     private static boolean sInitialHeapUpdate = DEFAULT_INITIAL_HEAP_UPDATE;
@@ -109,7 +109,7 @@ public final class DdmPreferences {
      * Sets the debug port used by the first {@link Client}.
      * <p>Once a port is used, the next Client will use port + 1. Quitting applications will
      * release their debug port, and new clients will be able to reuse them.
-     * <p>This must be called before {@link AndroidDebugBridge#init(boolean)}.
+     * <p>This must be called before {@link AndroidDebugBridge#init}.
      */
     public static void setDebugPortBase(int port) {
         sDebugPortBase = port;

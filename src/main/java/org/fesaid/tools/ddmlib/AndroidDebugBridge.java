@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.fesaid.tools.ddmlib.netty.AdbNettyConfig;
 
 /**
  * A connection to the host-side android debug bridge (adb)
@@ -34,37 +35,46 @@ import java.util.concurrent.TimeUnit;
  * <p>This is the central point to communicate with any devices, emulators, or the applications
  * running on them.
  *
- * <p><b>{@link #init(boolean)} must be called before anything is done.</b>
+ * <p>
+ * @author AOSP
  */
+@SuppressWarnings({"unused", "WeakerAccess"})
 public class AndroidDebugBridge {
-    /*
-     * Minimum and maximum version of adb supported. This correspond to
-     * ADB_SERVER_VERSION found in //device/tools/adb/adb.h
+
+    /**
+     * Minimum and maximum version of adb supported. This correspond to ADB_SERVER_VERSION found in //device/tools/adb/adb.h
      */
     private static final AdbVersion MIN_ADB_VERSION = AdbVersion.parseFrom("1.0.20");
 
-    private static final String ADB = "adb"; //$NON-NLS-1$
-    private static final String DDMS = "ddms"; //$NON-NLS-1$
-    private static final String SERVER_PORT_ENV_VAR = "ANDROID_ADB_SERVER_PORT"; //$NON-NLS-1$
+    private static final String ADB = "adb"; 
+    private static final String DDMS = "ddms"; 
+    private static final String SERVER_PORT_ENV_VAR = "ANDROID_ADB_SERVER_PORT"; 
 
-    // Where to find the ADB bridge.
-    static final int DEFAULT_ADB_PORT = 5037;
+    /**
+     * Where to find the ADB bridge.
+     */
+    private static final int DEFAULT_ADB_PORT = 5037;
 
-    // Only set when in unit testing mode. This is a hack until we move to devicelib.
-    // http://b.android.com/221925
+    /**
+     * Only set when in unit testing mode. This is a hack until we move to devicelib.
+     * http://b.android.com/221925
+     */
     private static boolean sUnitTestMode;
 
     /** Port where adb server will be started **/
     private static int sAdbServerPort = 0;
 
-    private static InetAddress sHostAddr;
     private static InetSocketAddress sSocketAddr;
 
     private static AndroidDebugBridge sThis;
     private static boolean sInitialized = false;
     private static boolean sClientSupport;
     private static boolean sUseLibusb;
-    private static Map<String, String> sEnv; // env vars to set while launching adb
+    private static AdbNettyConfig sAdbNettyConfig = new AdbNettyConfig();
+    /**
+     * env vars to set while launching adb
+     */
+    private static Map<String, String> sEnv;
 
     /** Full path to adb. */
     private String mAdbOsLocation = null;
@@ -75,17 +85,15 @@ public class AndroidDebugBridge {
 
     private DeviceMonitor mDeviceMonitor;
 
-    // lock object for synchronization
-    private static final Object sLock = new Object();
+    /**
+     * lock object for synchronization
+     */
+    private static final Object S_LOCK = new Object();
 
-    @GuardedBy("sLock")
-    private static final Set<IDebugBridgeChangeListener> sBridgeListeners =
-            Sets.newCopyOnWriteArraySet();
-
-    private static final Set<IDeviceChangeListener> sDeviceListeners =
-            Sets.newCopyOnWriteArraySet();
-    private static final Set<IClientChangeListener> sClientListeners =
-            Sets.newCopyOnWriteArraySet();
+    @GuardedBy("S_LOCK")
+    private static final Set<IDebugBridgeChangeListener> S_BRIDGE_LISTENERS = Sets.newCopyOnWriteArraySet();
+    private static final Set<IDeviceChangeListener> S_DEVICE_LISTENERS = Sets.newCopyOnWriteArraySet();
+    private static final Set<IClientChangeListener> S_CLIENT_LISTENERS = Sets.newCopyOnWriteArraySet();
 
     /**
      * Classes which implement this interface provide a method that deals with {@link
@@ -115,7 +123,8 @@ public class AndroidDebugBridge {
          *
          * @param isSuccessful if the bridge is successfully restarted.
          */
-        default void restartCompleted(boolean isSuccessful) {};
+        @SuppressWarnings("unused")
+        default void restartCompleted(boolean isSuccessful) {}
     }
 
     /**
@@ -175,15 +184,14 @@ public class AndroidDebugBridge {
      *
      * @param clientSupport Indicates whether the library should enable the monitoring and
      *                      interaction with applications running on the devices.
-     *
-     * @see #init(boolean)
+     * @param adbNettyConfig netty config
      */
-    public static synchronized void initIfNeeded(boolean clientSupport) {
+    public static synchronized void initIfNeeded(boolean clientSupport, AdbNettyConfig adbNettyConfig) {
         if (sInitialized) {
             return;
         }
 
-        init(clientSupport);
+        init(clientSupport, adbNettyConfig);
     }
 
     /**
@@ -211,25 +219,26 @@ public class AndroidDebugBridge {
      * @see AndroidDebugBridge#createBridge(String, boolean)
      * @see DdmPreferences
      */
-    public static synchronized void init(boolean clientSupport) {
-        init(clientSupport, false, ImmutableMap.of());
+    public static synchronized void init(boolean clientSupport, AdbNettyConfig adbNettyConfig) {
+        init(clientSupport, false, ImmutableMap.of(), adbNettyConfig);
     }
 
     public static synchronized void init(
-            boolean clientSupport, boolean useLibusb, @NonNull Map<String, String> env) {
+            boolean clientSupport, boolean useLibusb, @NonNull Map<String, String> env,
+        @NonNull AdbNettyConfig adbNettyConfig) {
         Preconditions.checkState(
                 !sInitialized, "AndroidDebugBridge.init() has already been called.");
         sInitialized = true;
         sClientSupport = clientSupport;
         sUseLibusb = useLibusb;
         sEnv = env;
-
+        sAdbNettyConfig = adbNettyConfig;
+        AdbHelper.init(sAdbNettyConfig);
         // Determine port and instantiate socket address.
         initAdbSocketAddr();
 
         MonitorThread monitorThread = MonitorThread.createInstance();
         monitorThread.start();
-
         HandleHello.register(monitorThread);
         HandleAppName.register(monitorThread);
         HandleTest.register(monitorThread);
@@ -287,6 +296,10 @@ public class AndroidDebugBridge {
         return sClientSupport;
     }
 
+    static AdbNettyConfig getNettyConfig() {
+        return sAdbNettyConfig;
+    }
+
     /**
      * Returns the socket address of the ADB server on the host.
      */
@@ -303,7 +316,7 @@ public class AndroidDebugBridge {
      * @return a connected bridge.
      */
     public static AndroidDebugBridge createBridge() {
-        synchronized (sLock) {
+        synchronized (S_LOCK) {
             if (sThis != null) {
                 return sThis;
             }
@@ -316,7 +329,7 @@ public class AndroidDebugBridge {
             }
 
             // notify the listeners of the change
-            for (IDebugBridgeChangeListener listener : sBridgeListeners) {
+            for (IDebugBridgeChangeListener listener : S_BRIDGE_LISTENERS) {
                 // we attempt to catch any exception so that a bad listener doesn't kill our thread
                 try {
                     listener.bridgeChanged(sThis);
@@ -343,7 +356,7 @@ public class AndroidDebugBridge {
     @Nullable
     public static AndroidDebugBridge createBridge(@NonNull String osLocation,
                                                   boolean forceNewBridge) {
-        synchronized (sLock) {
+        synchronized (S_LOCK) {
             if (!sUnitTestMode) {
                 if (sThis != null) {
                     if (sThis.mAdbOsLocation != null
@@ -367,7 +380,7 @@ public class AndroidDebugBridge {
             }
 
             // notify the listeners of the change
-            for (IDebugBridgeChangeListener listener : sBridgeListeners) {
+            for (IDebugBridgeChangeListener listener : S_BRIDGE_LISTENERS) {
                 // we attempt to catch any exception so that a bad listener doesn't kill our thread
                 try {
                     listener.bridgeChanged(sThis);
@@ -395,13 +408,13 @@ public class AndroidDebugBridge {
      * A new object will have to be created with {@link #createBridge(String, boolean)}.
      */
     public static void disconnectBridge() {
-        synchronized (sLock) {
+        synchronized (S_LOCK) {
             if (sThis != null) {
                 sThis.stop();
                 sThis = null;
 
                 // notify the listeners.
-                for (IDebugBridgeChangeListener listener : sBridgeListeners) {
+                for (IDebugBridgeChangeListener listener : S_BRIDGE_LISTENERS) {
                     // we attempt to catch any exception so that a bad listener doesn't kill our
                     // thread
                     try {
@@ -421,8 +434,8 @@ public class AndroidDebugBridge {
      * @param listener The listener which should be notified.
      */
     public static void addDebugBridgeChangeListener(@NonNull IDebugBridgeChangeListener listener) {
-        synchronized (sLock) {
-            sBridgeListeners.add(listener);
+        synchronized (S_LOCK) {
+            S_BRIDGE_LISTENERS.add(listener);
 
             if (sThis != null) {
                 // we attempt to catch any exception so that a bad listener doesn't kill our thread
@@ -441,8 +454,8 @@ public class AndroidDebugBridge {
      * @param listener The listener which should no longer be notified.
      */
     public static void removeDebugBridgeChangeListener(IDebugBridgeChangeListener listener) {
-        synchronized (sLock) {
-            sBridgeListeners.remove(listener);
+        synchronized (S_LOCK) {
+            S_BRIDGE_LISTENERS.remove(listener);
         }
     }
 
@@ -454,7 +467,7 @@ public class AndroidDebugBridge {
      * @param listener The listener which should be notified.
      */
     public static void addDeviceChangeListener(@NonNull IDeviceChangeListener listener) {
-        sDeviceListeners.add(listener);
+        S_DEVICE_LISTENERS.add(listener);
     }
 
     /**
@@ -465,7 +478,7 @@ public class AndroidDebugBridge {
      * @param listener The listener which should no longer be notified.
      */
     public static void removeDeviceChangeListener(IDeviceChangeListener listener) {
-        sDeviceListeners.remove(listener);
+        S_DEVICE_LISTENERS.remove(listener);
     }
 
     /**
@@ -476,7 +489,7 @@ public class AndroidDebugBridge {
      * @param listener The listener which should be notified.
      */
     public static void addClientChangeListener(IClientChangeListener listener) {
-        sClientListeners.add(listener);
+        S_CLIENT_LISTENERS.add(listener);
     }
 
     /**
@@ -486,7 +499,7 @@ public class AndroidDebugBridge {
      * @param listener The listener which should no longer be notified.
      */
     public static void removeClientChangeListener(IClientChangeListener listener) {
-        sClientListeners.remove(listener);
+        S_CLIENT_LISTENERS.remove(listener);
     }
 
 
@@ -496,7 +509,7 @@ public class AndroidDebugBridge {
      */
     @NonNull
     public IDevice[] getDevices() {
-        synchronized (sLock) {
+        synchronized (S_LOCK) {
             if (mDeviceMonitor != null) {
                 return mDeviceMonitor.getDevices();
             }
@@ -569,7 +582,7 @@ public class AndroidDebugBridge {
     /**
      * Creates a new bridge.
      * @param osLocation the location of the command line tool
-     * @throws InvalidParameterException
+     * @throws InvalidParameterException InvalidParameterException
      */
     private AndroidDebugBridge(String osLocation) throws InvalidParameterException {
         if (osLocation == null || osLocation.isEmpty()) {
@@ -630,47 +643,43 @@ public class AndroidDebugBridge {
 
     public static ListenableFuture<AdbVersion> getAdbVersion(@NonNull final File adb) {
         final SettableFuture<AdbVersion> future = SettableFuture.create();
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                ProcessBuilder pb = new ProcessBuilder(adb.getPath(), "version");
-                pb.redirectErrorStream(true);
+        new Thread(() -> {
+            ProcessBuilder pb = new ProcessBuilder(adb.getPath(), "version");
+            pb.redirectErrorStream(true);
 
-                Process p = null;
-                try {
-                    p = pb.start();
-                } catch (IOException e) {
-                    future.setException(e);
-                    return;
-                }
-
-                StringBuilder sb = new StringBuilder();
-                BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                try {
-                    String line;
-                    while ((line = br.readLine()) != null) {
-                        AdbVersion version = AdbVersion.parseFrom(line);
-                        if (version != AdbVersion.UNKNOWN) {
-                            future.set(version);
-                            return;
-                        }
-                        sb.append(line);
-                        sb.append('\n');
-                    }
-                } catch (IOException e) {
-                    future.setException(e);
-                    return;
-                } finally {
-                    try {
-                        br.close();
-                    } catch (IOException e) {
-                        future.setException(e);
-                    }
-                }
-
-                future.setException(new RuntimeException(
-                        "Unable to detect adb version, adb output: " + sb.toString()));
+            Process p = null;
+            try {
+                p = pb.start();
+            } catch (IOException e) {
+                future.setException(e);
+                return;
             }
+
+            StringBuilder sb = new StringBuilder();
+            BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            try {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    AdbVersion version = AdbVersion.parseFrom(line);
+                    if (version != AdbVersion.UNKNOWN) {
+                        future.set(version);
+                        return;
+                    }
+                    sb.append(line);
+                    sb.append('\n');
+                }
+            } catch (IOException e) {
+                future.setException(e);
+                return;
+            } finally {
+                try {
+                    br.close();
+                } catch (IOException e) {
+                    future.setException(e);
+                }
+            }
+
+            future.setException(new RuntimeException("Unable to detect adb version, adb output: " + sb.toString()));
         }, "Obtaining adb version").start();
         return future;
     }
@@ -684,9 +693,7 @@ public class AndroidDebugBridge {
         if (mAdbOsLocation != null && sAdbServerPort != 0 && (!mVersionCheck || !startAdb())) {
             return false;
         }
-
         mStarted = true;
-
         // now that the bridge is connected, we start the underlying services.
         mDeviceMonitor = new DeviceMonitor(this);
         mDeviceMonitor.start();
@@ -725,23 +732,23 @@ public class AndroidDebugBridge {
     public boolean restart() {
         if (mAdbOsLocation == null) {
             Log.e(ADB,
-                    "Cannot restart adb when AndroidDebugBridge is created without the location of adb."); //$NON-NLS-1$
+                    "Cannot restart adb when AndroidDebugBridge is created without the location of adb."); 
             return false;
         }
 
         if (sAdbServerPort == 0) {
-            Log.e(ADB, "ADB server port for restarting AndroidDebugBridge is not set."); //$NON-NLS-1$
+            Log.e(ADB, "ADB server port for restarting AndroidDebugBridge is not set."); 
             return false;
         }
 
         if (!mVersionCheck) {
             Log.logAndDisplay(Log.LogLevel.ERROR, ADB,
-                    "Attempting to restart adb, but version check failed!"); //$NON-NLS-1$
+                    "Attempting to restart adb, but version check failed!"); 
             return false;
         }
 
-        synchronized (sLock) {
-            for (IDebugBridgeChangeListener listener : sBridgeListeners) {
+        synchronized (S_LOCK) {
+            for (IDebugBridgeChangeListener listener : S_BRIDGE_LISTENERS) {
                 listener.restartInitiated();
             }
         }
@@ -757,8 +764,8 @@ public class AndroidDebugBridge {
             }
         }
 
-        synchronized (sLock) {
-            for (IDebugBridgeChangeListener listener : sBridgeListeners) {
+        synchronized (S_LOCK) {
+            for (IDebugBridgeChangeListener listener : S_BRIDGE_LISTENERS) {
                 listener.restartCompleted(restart);
             }
         }
@@ -780,7 +787,7 @@ public class AndroidDebugBridge {
      * @see #getLock()
      */
     static void deviceConnected(@NonNull IDevice device) {
-        for (IDeviceChangeListener listener : sDeviceListeners) {
+        for (IDeviceChangeListener listener : S_DEVICE_LISTENERS) {
             // we attempt to catch any exception so that a bad listener doesn't kill our thread
             try {
                 listener.deviceConnected(device);
@@ -804,7 +811,7 @@ public class AndroidDebugBridge {
      * @see #getLock()
      */
     static void deviceDisconnected(@NonNull IDevice device) {
-        for (IDeviceChangeListener listener : sDeviceListeners) {
+        for (IDeviceChangeListener listener : S_DEVICE_LISTENERS) {
             // we attempt to catch any exception so that a bad listener doesn't kill our
             // thread
             try {
@@ -830,7 +837,7 @@ public class AndroidDebugBridge {
      */
     static void deviceChanged(@NonNull IDevice device, int changeMask) {
         // Notify the listeners
-        for (IDeviceChangeListener listener : sDeviceListeners) {
+        for (IDeviceChangeListener listener : S_DEVICE_LISTENERS) {
             // we attempt to catch any exception so that a bad listener doesn't kill our
             // thread
             try {
@@ -857,7 +864,7 @@ public class AndroidDebugBridge {
      */
     static void clientChanged(@NonNull Client client, int changeMask) {
         // Notify the listeners
-        for (IClientChangeListener listener : sClientListeners) {
+        for (IClientChangeListener listener : S_CLIENT_LISTENERS) {
             // we attempt to catch any exception so that a bad listener doesn't kill our
             // thread
             try {
@@ -887,12 +894,12 @@ public class AndroidDebugBridge {
 
         if (mAdbOsLocation == null) {
             Log.e(ADB,
-                "Cannot start adb when AndroidDebugBridge is created without the location of adb."); //$NON-NLS-1$
+                "Cannot start adb when AndroidDebugBridge is created without the location of adb."); 
             return false;
         }
 
         if (sAdbServerPort == 0) {
-            Log.w(ADB, "ADB server port for starting AndroidDebugBridge is not set."); //$NON-NLS-1$
+            Log.w(ADB, "ADB server port for starting AndroidDebugBridge is not set."); 
             return false;
         }
 
@@ -918,21 +925,17 @@ public class AndroidDebugBridge {
 
             ArrayList<String> errorOutput = new ArrayList<String>();
             ArrayList<String> stdOutput = new ArrayList<String>();
-            status = grabProcessOutput(proc, errorOutput, stdOutput, false /* waitForReaders */);
-        } catch (IOException ioe) {
-            Log.e(DDMS, "Unable to run 'adb': " + ioe.getMessage()); //$NON-NLS-1$
-            // we'll return false;
-        } catch (InterruptedException ie) {
-            Log.e(DDMS, "Unable to run 'adb': " + ie.getMessage()); //$NON-NLS-1$
+            status = grabProcessOutput(proc, errorOutput, stdOutput, false);
+        } catch (IOException | InterruptedException ioe) {
+            Log.e(DDMS, "Unable to run 'adb': " + ioe.getMessage()); 
             // we'll return false;
         }
-
         if (status != 0) {
             Log.e(DDMS,
-                String.format("'%1$s' failed -- run manually if necessary", commandString)); //$NON-NLS-1$
+                String.format("'%1$s' failed -- run manually if necessary", commandString)); 
             return false;
         } else {
-            Log.d(DDMS, String.format("'%1$s' succeeded", commandString)); //$NON-NLS-1$
+            Log.d(DDMS, String.format("'%1$s' succeeded", commandString)); 
             return true;
         }
     }
@@ -941,7 +944,7 @@ public class AndroidDebugBridge {
         List<String> command = new ArrayList<String>(4);
         command.add(mAdbOsLocation);
         if (sAdbServerPort != DEFAULT_ADB_PORT) {
-            command.add("-P"); //$NON-NLS-1$
+            command.add("-P"); 
             command.add(Integer.toString(sAdbServerPort));
         }
         command.add(option);
@@ -968,15 +971,12 @@ public class AndroidDebugBridge {
         Process proc;
         int status = -1;
 
-        String[] command = getAdbLaunchCommand("kill-server"); //$NON-NLS-1$
+        String[] command = getAdbLaunchCommand("kill-server"); 
         try {
             proc = Runtime.getRuntime().exec(command);
             status = proc.waitFor();
         }
-        catch (IOException ioe) {
-            // we'll return false;
-        }
-        catch (InterruptedException ie) {
+        catch (IOException | InterruptedException ioe) {
             // we'll return false;
         }
 
@@ -1007,7 +1007,7 @@ public class AndroidDebugBridge {
         assert stdOutput != null;
         // read the lines as they come. if null is returned, it's
         // because the process finished
-        Thread t1 = new Thread("adb:stderr reader") { //$NON-NLS-1$
+        Thread t1 = new Thread("adb:stderr reader") { 
             @Override
             public void run() {
                 // create a buffer to read the stderr output
@@ -1033,7 +1033,7 @@ public class AndroidDebugBridge {
             }
         };
 
-        Thread t2 = new Thread("adb:stdout reader") { //$NON-NLS-1$
+        Thread t2 = new Thread("adb:stdout reader") { 
             @Override
             public void run() {
                 InputStreamReader is = new InputStreamReader(process.getInputStream(),
@@ -1067,11 +1067,11 @@ public class AndroidDebugBridge {
         if (waitForReaders) {
             try {
                 t1.join();
-            } catch (InterruptedException e) {
+            } catch (InterruptedException ignored) {
             }
             try {
                 t2.join();
-            } catch (InterruptedException e) {
+            } catch (InterruptedException ignored) {
             }
         }
 
@@ -1086,7 +1086,7 @@ public class AndroidDebugBridge {
      * devices, and clients.
      */
     private static Object getLock() {
-        return sLock;
+        return S_LOCK;
     }
 
     /**
@@ -1097,8 +1097,7 @@ public class AndroidDebugBridge {
         if (!sUnitTestMode) {
             sAdbServerPort = getAdbServerPort();
         }
-        sHostAddr = InetAddress.getLoopbackAddress();
-        sSocketAddr = new InetSocketAddress(sHostAddr, sAdbServerPort);
+        sSocketAddr = new InetSocketAddress(InetAddress.getLoopbackAddress(), sAdbServerPort);
     }
 
     /**
