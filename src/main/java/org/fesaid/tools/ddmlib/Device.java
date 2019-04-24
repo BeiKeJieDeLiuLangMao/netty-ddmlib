@@ -213,16 +213,6 @@ final class Device implements IDevice {
     }
 
     @Override
-    public Map<String, String> getProperties() {
-        return Collections.unmodifiableMap(mPropFetcher.getProperties());
-    }
-
-    @Override
-    public int getPropertyCount() {
-        return mPropFetcher.getProperties().size();
-    }
-
-    @Override
     public String getProperty(@NonNull String name) {
         Map<String, String> properties = mPropFetcher.getProperties();
         long timeout = properties.isEmpty() ? INITIAL_GET_PROP_TIMEOUT_MS : GET_PROP_TIMEOUT_MS;
@@ -233,33 +223,6 @@ final class Device implements IDevice {
         } catch (InterruptedException
             | ExecutionException
             | java.util.concurrent.TimeoutException e) {
-            // ignore
-        }
-        return null;
-    }
-
-    @Override
-    public boolean arePropertiesSet() {
-        return mPropFetcher.arePropertiesSet();
-    }
-
-    @Override
-    public String getPropertyCacheOrSync(String name) {
-        Future<String> future = mPropFetcher.getProperty(name);
-        try {
-            return future.get();
-        } catch (InterruptedException | ExecutionException e) {
-            // ignore
-        }
-        return null;
-    }
-
-    @Override
-    public String getPropertySync(String name) {
-        Future<String> future = mPropFetcher.getProperty(name);
-        try {
-            return future.get();
-        } catch (InterruptedException | ExecutionException e) {
             // ignore
         }
         return null;
@@ -290,9 +253,8 @@ final class Device implements IDevice {
     }
 
     /**
-     *  The full list of features can be obtained from /etc/permissions/features*
-     *  However, the smaller set of features we are interested in can be obtained by
-     *  reading the build characteristics property.
+     * The full list of features can be obtained from /etc/permissions/features* However, the smaller set of features we
+     * are interested in can be obtained by reading the build characteristics property.
      */
     @Override
     public boolean supportsFeature(@NonNull HardwareFeature feature) {
@@ -335,7 +297,8 @@ final class Device implements IDevice {
     }
 
     @Override
-    public void setIme(String ime) throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException {
+    public void setIme(
+        String ime) throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException {
         this.execute("ime set " + ime, 20L, TimeUnit.SECONDS);
     }
 
@@ -434,7 +397,6 @@ final class Device implements IDevice {
     public boolean isBootLoader() {
         return mState == DeviceState.BOOTLOADER;
     }
-
 
     @Override
     public SyncService getSyncService()
@@ -874,19 +836,22 @@ final class Device implements IDevice {
     }
 
     @Override
-    public void installPackage(InputStream inputStream, boolean reinstall, String... extraArgs) throws InstallException,
-        TimeoutException, AdbCommandRejectedException, SyncException, IOException {
+    public void installPackage(InputStream inputStream, boolean reinstall, String... extraArgs) throws InstallException{
         // Use default basic installReceiver
-        String remoteFilePath = syncPackageToDevice(inputStream);
-        installRemotePackage(
-            remoteFilePath,
-            reinstall,
-            new InstallReceiver(),
-            0L,
-            INSTALL_TIMEOUT_MINUTES,
-            TimeUnit.MINUTES,
-            extraArgs);
-        removeRemotePackage(remoteFilePath);
+        try {
+            String remoteFilePath = syncPackageToDevice(inputStream);
+            installRemotePackage(
+                remoteFilePath,
+                reinstall,
+                new InstallReceiver(),
+                0L,
+                INSTALL_TIMEOUT_MINUTES,
+                TimeUnit.MINUTES,
+                extraArgs);
+            removeRemotePackage(remoteFilePath);
+        } catch (Exception e) {
+            throw new InstallException(e);
+        }
     }
 
     @Override
@@ -1191,22 +1156,6 @@ final class Device implements IDevice {
         return mIsRoot;
     }
 
-    @Override
-    public Integer getBatteryLevel() {
-        // use default of 5 minutes
-        return getBatteryLevel(5 * 60 * 1000);
-    }
-
-    @Override
-    public Integer getBatteryLevel(long freshnessMs) {
-        Future<Integer> futureBattery = getBattery(freshnessMs, TimeUnit.MILLISECONDS);
-        try {
-            return futureBattery.get();
-        } catch (InterruptedException | ExecutionException e) {
-            return null;
-        }
-    }
-
     @NonNull
     @Override
     public Future<Integer> getBattery() {
@@ -1261,7 +1210,7 @@ final class Device implements IDevice {
 
     @Override
     public String getLanguage() {
-        return getProperties().get(IDevice.PROP_DEVICE_LANGUAGE);
+        return getProperty(IDevice.PROP_DEVICE_LANGUAGE);
     }
 
     @Override
