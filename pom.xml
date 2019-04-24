@@ -7,14 +7,21 @@
     <groupId>org.fesaid.tools</groupId>
     <artifactId>ddmlib</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <name>Netty ddmlib</name>
+    <name>netty ddmlib</name>
     <description>Library providing APIs to talk to Android devices based on netty</description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+    </properties>
 
     <dependencies>
         <dependency>
             <groupId>com.android.tools</groupId>
             <artifactId>common</artifactId>
-            <version>26.2.0-alpha15</version>
+            <version>26.4.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -39,9 +46,9 @@
 
     <repositories>
         <repository>
-            <id>pentaho-repo</id>
-            <name>pentaho-repo</name>
-            <url>https://public.nexus.pentaho.org/content/groups/omni/</url>
+            <id>google-repository</id>
+            <name>google-repository</name>
+            <url>https://maven.google.com/</url>
         </repository>
     </repositories>
 
@@ -50,9 +57,10 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.1</version>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
                 </configuration>
             </plugin>
         </plugins>
