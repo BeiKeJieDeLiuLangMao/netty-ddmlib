@@ -9,7 +9,11 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-public class SplitApkInstaller extends SplitApkInstallerBase {
+/**
+ * @author AOSP
+ */
+@SuppressWarnings("WeakerAccess")
+public class SplitApkInstaller extends BaseSplitApkInstaller {
     private static final String LOG_TAG = "SplitApkInstaller";
 
     @NonNull private final List<File> mApks;
@@ -170,7 +174,7 @@ public class SplitApkInstaller extends SplitApkInstallerBase {
      * @param device the device to install APK, must include at least the main APK.
      * @param apks list of APK files.
      * @param reInstall whether to enable reinstall option.
-     * @param options list of install options.
+     * @param installOptions list of install options.
      */
     public static SplitApkInstaller create(
             @NonNull IDevice device,
@@ -190,7 +194,7 @@ public class SplitApkInstaller extends SplitApkInstallerBase {
      *     with.
      * @param apks list of APK files.
      * @param reInstall whether to enable reinstall option.
-     * @param pmOptions list of install options.
+     * @param installOptions list of install options.
      */
     public static SplitApkInstaller create(
             @NonNull IDevice device,

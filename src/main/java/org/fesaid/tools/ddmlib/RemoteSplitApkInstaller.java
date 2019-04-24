@@ -4,7 +4,11 @@ import com.android.annotations.NonNull;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-public class RemoteSplitApkInstaller extends SplitApkInstallerBase {
+/**
+ * @author AOSP
+ */
+@SuppressWarnings("WeakerAccess")
+public class RemoteSplitApkInstaller extends BaseSplitApkInstaller {
     private static final String LOG_TAG = "RemoteSplitApkInstaller";
 
     @NonNull private final List<String> mRemoteApkPaths;
@@ -19,7 +23,7 @@ public class RemoteSplitApkInstaller extends SplitApkInstallerBase {
      * Installs an Android application made of several APK files sitting locally on the device
      *
      * @param timeout installation timeout
-     * @param timeoutUnit {@link TimeUnit} corresponding to the timeout parameter
+     * @param unit {@link TimeUnit} corresponding to the timeout parameter
      * @throws InstallException if the installation fails.
      */
     public void install(long timeout, @NonNull TimeUnit unit) throws InstallException {
@@ -120,10 +124,9 @@ public class RemoteSplitApkInstaller extends SplitApkInstallerBase {
      * the given device.
      *
      * @param device the device to install APK, must include at least the main APK.
-     * @param applicationId the application id that to install new APKs with.
-     * @param apks list of remote APKs.
+     * @param remoteApks list of remote APKs.
      * @param reInstall whether to enable reinstall option.
-     * @param pmOptions list of install options.
+     * @param installOptions list of install options.
      */
     public static RemoteSplitApkInstaller create(
             @NonNull IDevice device,
@@ -142,9 +145,9 @@ public class RemoteSplitApkInstaller extends SplitApkInstallerBase {
      * @param device the device to install APK.
      * @param applicationId the application id of the existing application that to install new APKs
      *     with.
-     * @param apks list of remote APKs.
+     * @param remoteApks list of remote APKs.
      * @param reInstall whether to enable reinstall option.
-     * @param pmOptions list of install options.
+     * @param installOptions list of install options.
      */
     public static RemoteSplitApkInstaller create(
             @NonNull IDevice device,

@@ -8,14 +8,17 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-public abstract class SplitApkInstallerBase {
+/**
+ * @author AOSP
+ */
+public abstract class BaseSplitApkInstaller {
     private static final String LOG_TAG = "SplitApkInstallerBase";
 
     @NonNull private final IDevice mDevice;
     @NonNull private final String mOptions;
     @NonNull private final String mPrefix;
 
-    protected SplitApkInstallerBase(@NonNull IDevice device, @NonNull String options) {
+    protected BaseSplitApkInstaller(@NonNull IDevice device, @NonNull String options) {
         this.mDevice = device;
         this.mOptions = options;
         this.mPrefix =

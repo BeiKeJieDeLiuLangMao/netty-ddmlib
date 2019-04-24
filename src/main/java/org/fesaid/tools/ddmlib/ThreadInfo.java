@@ -2,7 +2,9 @@ package org.fesaid.tools.ddmlib;
 
 /**
  * Holds a thread information.
+ * @author AOSP
  */
+@SuppressWarnings("unused")
 public final class ThreadInfo implements IStackTraceInfo {
     private int mThreadId;
     private String mThreadName;
@@ -44,6 +46,7 @@ public final class ThreadInfo implements IStackTraceInfo {
 
     /**
      * Sets the stack call of the thread.
+     *
      * @param trace stackcall information.
      */
     void setStackCall(StackTraceElement[] trace) {
@@ -104,9 +107,8 @@ public final class ThreadInfo implements IStackTraceInfo {
         return mIsDaemon;
     }
 
-    /*
-     * (non-Javadoc)
-     * @see IStackTraceInfo#getStackTrace()
+    /**
+     * IStackTraceInfo#getStackTrace()
      */
     @Override
     public StackTraceElement[] getStackTrace() {
@@ -115,6 +117,7 @@ public final class ThreadInfo implements IStackTraceInfo {
 
     /**
      * Returns the approximate time of the stacktrace data.
+     *
      * @see #getStackTrace()
      */
     public long getStackCallTime() {

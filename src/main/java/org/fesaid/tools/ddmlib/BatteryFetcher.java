@@ -15,8 +15,10 @@ import java.util.regex.Pattern;
 class BatteryFetcher {
     private static final String LOG_TAG = "BatteryFetcher";
 
-    /** The amount of time to wait between unsuccessful battery fetch attempts. */
-    private static final long BATTERY_TIMEOUT_MS = 2 * 1000; // 2 seconds
+    /**
+     * The amount of time to wait between unsuccessful battery fetch attempts.
+     */
+    private static final long BATTERY_TIMEOUT_MS = 2 * 1000;
 
     /**
      * Output receiver for "cat /sys/class/power_supply/.../capacity" command line.

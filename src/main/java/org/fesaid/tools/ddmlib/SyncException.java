@@ -7,7 +7,9 @@ import java.io.IOException;
  * <p>This is different from an {@link IOException} because it's not the underlying connection
  * that triggered the error, but the adb transfer protocol that didn't work somehow, or that the
  * targets (local and/or remote) were wrong.
+ * @author AOSP
  */
+@SuppressWarnings({"WeakerAccess", "unused"})
 public class SyncException extends CanceledException {
     private static final long serialVersionUID = 1L;
 
