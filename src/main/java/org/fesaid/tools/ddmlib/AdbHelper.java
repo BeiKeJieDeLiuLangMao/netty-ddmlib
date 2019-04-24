@@ -20,7 +20,7 @@ import org.fesaid.tools.ddmlib.log.LogReceiver;
  * <p>This currently uses spin-wait non-blocking I/O. A Selector would be more efficient,
  * but seems like overkill for what we're doing here.
  */
-@SuppressWarnings("WeakerAccess")
+@SuppressWarnings({"WeakerAccess"})
 final class AdbHelper {
 
     // public static final long kOkay = 0x59414b4fL;
@@ -58,40 +58,6 @@ final class AdbHelper {
     }
 
     /**
-     * Create and connect a new pass-through socket, from the host to a port on the device.
-     *
-     * @param adbSockAddr adb socket address
-     * @param device the device to connect to. Can be null in which case the connection will be to the first available
-     * device.
-     * @param devicePort the port we're opening
-     * @throws TimeoutException in case of timeout on the connection.
-     * @throws IOException in case of I/O error on the connection.
-     * @throws AdbCommandRejectedException if adb rejects the command
-     */
-    public static SocketChannel open(InetSocketAddress adbSockAddr,
-        Device device, int devicePort) throws IOException, TimeoutException, AdbCommandRejectedException {
-        SocketChannel adbChan = SocketChannel.open(adbSockAddr);
-        try {
-            adbChan.socket().setTcpNoDelay(true);
-            adbChan.configureBlocking(false);
-            // if the device is not -1, then we first tell adb we're looking to
-            // talk to a specific device
-            setDevice(adbChan, device);
-            byte[] req = createAdbForwardRequest(devicePort);
-            write(adbChan, req);
-            AdbResponse resp = readAdbResponse(adbChan, false);
-            if (!resp.okay) {
-                throw new AdbCommandRejectedException(resp.message);
-            }
-            adbChan.configureBlocking(true);
-        } catch (TimeoutException | IOException | AdbCommandRejectedException e) {
-            adbChan.close();
-            throw e;
-        }
-        return adbChan;
-    }
-
-    /**
      * Creates and connects a new pass-through socket, from the host to a port on the device.
      *
      * @param adbSockAddr adb socket address
@@ -114,7 +80,7 @@ final class AdbHelper {
             setDevice(adbChan, device);
             byte[] req = createJdwpForwardRequest(pid);
             write(adbChan, req);
-            AdbResponse resp = readAdbResponse(adbChan, false /* readDiagString */);
+            AdbResponse resp = readAdbResponse(adbChan);
             if (!resp.okay) {
                 throw new AdbCommandRejectedException(resp.message);
             }
@@ -124,15 +90,6 @@ final class AdbHelper {
             throw e;
         }
         return adbChan;
-    }
-
-    /**
-     * Creates a port forwarding request for adb. This returns an array containing "####tcp:{port}:{addStr}".
-     *
-     * @param port the port on the device. This does not need to be numeric.
-     */
-    private static byte[] createAdbForwardRequest(int port) {
-        return formAdbRequest("tcp:" + port);
     }
 
     /**
@@ -160,15 +117,13 @@ final class AdbHelper {
      * Reads the response from ADB after a command.
      *
      * @param chan The socket channel that is connected to adb.
-     * @param readDiagString If true, we're expecting an OKAY response to be followed by a diagnostic string. Otherwise,
-     * we only expect the diagnostic string to follow a FAIL.
      * @throws TimeoutException in case of timeout on the connection.
      * @throws IOException in case of I/O error on the connection.
      */
-    static AdbResponse readAdbResponse(SocketChannel chan, boolean readDiagString)
+    static AdbResponse readAdbResponse(SocketChannel chan)
         throws TimeoutException, IOException {
         AdbResponse resp = new AdbResponse();
-
+        boolean readDiagString = false;
         byte[] reply = new byte[4];
         read(chan, reply);
 
@@ -239,7 +194,7 @@ final class AdbHelper {
             // to a specific device
             setDevice(adbChan, device);
             write(adbChan, request);
-            AdbResponse resp = readAdbResponse(adbChan, false);
+            AdbResponse resp = readAdbResponse(adbChan);
             if (!resp.okay) {
                 throw new AdbCommandRejectedException(resp.message);
             }
@@ -423,7 +378,7 @@ final class AdbHelper {
             byte[] request = formAdbRequest(adbService.name().toLowerCase() + ":" + command);
             write(adbChan, request);
 
-            AdbResponse resp = readAdbResponse(adbChan, false);
+            AdbResponse resp = readAdbResponse(adbChan);
             if (!resp.okay) {
                 Log.e("ddms", "ADB rejected shell command (" + command + "): " + resp.message);
                 throw new AdbCommandRejectedException(resp.message);
@@ -590,7 +545,7 @@ final class AdbHelper {
             byte[] request = formAdbRequest("log:" + logName);
             write(adbChan, request);
 
-            AdbResponse resp = readAdbResponse(adbChan, false);
+            AdbResponse resp = readAdbResponse(adbChan);
             if (!resp.okay) {
                 throw new AdbCommandRejectedException(resp.message);
             }
@@ -644,7 +599,7 @@ final class AdbHelper {
                 "host-serial:%1$s:forward:%2$s;%3$s",
                 device.getSerialNumber(), localPortSpec, remotePortSpec));
             write(adbChan, request);
-            AdbResponse resp = readAdbResponse(adbChan, false);
+            AdbResponse resp = readAdbResponse(adbChan);
             if (!resp.okay) {
                 Log.w("create-forward", "Error creating forward: " + resp.message);
                 throw new AdbCommandRejectedException(resp.message);
@@ -671,7 +626,7 @@ final class AdbHelper {
                 "host-serial:%1$s:killforward:%2$s",
                 device.getSerialNumber(), localPortSpec));
             write(adbChan, request);
-            AdbResponse resp = readAdbResponse(adbChan, false);
+            AdbResponse resp = readAdbResponse(adbChan);
             if (!resp.okay) {
                 Log.w("remove-forward", "Error creating forward: " + resp.message);
                 throw new AdbCommandRejectedException(resp.message);
@@ -821,7 +776,7 @@ final class AdbHelper {
             String msg = "host:transport:" + device.getSerialNumber();
             byte[] deviceQuery = formAdbRequest(msg);
             write(adbChan, deviceQuery);
-            AdbResponse resp = readAdbResponse(adbChan, false);
+            AdbResponse resp = readAdbResponse(adbChan);
             if (!resp.okay) {
                 throw new AdbCommandRejectedException(resp.message, true);
             }
@@ -871,7 +826,7 @@ final class AdbHelper {
             // to a specific device
             setDevice(adbChan, device);
             write(adbChan, request);
-            AdbResponse resp = readAdbResponse(adbChan, false);
+            AdbResponse resp = readAdbResponse(adbChan);
             if (!resp.okay) {
                 Log.w("root", "Error setting root: " + resp.message);
                 throw new AdbCommandRejectedException(resp.message);

@@ -182,7 +182,7 @@ public class SyncService {
             byte[] request = AdbHelper.formAdbRequest("sync:"); //$NON-NLS-1$
             AdbHelper.write(mChannel, request, -1, DdmPreferences.getTimeOut());
 
-            AdbResponse resp = AdbHelper.readAdbResponse(mChannel, false /* readDiagString */);
+            AdbResponse resp = AdbHelper.readAdbResponse(mChannel  /* readDiagString */);
 
             if (!resp.okay) {
                 Log.w("ddms", "Got unhappy response from ADB sync req: " + resp.message);

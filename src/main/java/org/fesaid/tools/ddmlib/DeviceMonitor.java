@@ -413,7 +413,7 @@ final class DeviceMonitor implements ClientTracker {
         try {
             AdbHelper.setDevice(socket, device);
             AdbHelper.write(socket, AdbHelper.formAdbRequest(ADB_TRACK_JDWP_COMMAND));
-            AdbResponse resp = AdbHelper.readAdbResponse(socket, false);
+            AdbResponse resp = AdbHelper.readAdbResponse(socket);
 
             if (!resp.okay) {
                 // request was refused by adb!
@@ -779,7 +779,7 @@ final class DeviceMonitor implements ClientTracker {
 
             try {
                 AdbHelper.write(mAdbConnection, request);
-                AdbResponse resp = AdbHelper.readAdbResponse(mAdbConnection, false);
+                AdbResponse resp = AdbHelper.readAdbResponse(mAdbConnection);
                 if (!resp.okay) {
                     // request was refused by adb!
                     Log.e("DeviceMonitor", "adb refused request: " + resp.message);
