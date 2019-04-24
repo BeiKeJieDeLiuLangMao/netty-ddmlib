@@ -2,6 +2,7 @@ package org.fesaid.tools.ddmlib.logcat;
 
 import com.android.annotations.NonNull;
 import com.android.annotations.concurrency.GuardedBy;
+import java.util.concurrent.TimeUnit;
 import org.fesaid.tools.ddmlib.AdbCommandRejectedException;
 import org.fesaid.tools.ddmlib.IDevice;
 import org.fesaid.tools.ddmlib.IShellOutputReceiver;
@@ -17,15 +18,19 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * @author AOSP
+ */
+@SuppressWarnings("unused")
 public class LogCatReceiverTask implements Runnable {
-    private static final String LOGCAT_COMMAND = "logcat -v long"; //$NON-NLS-1$
+    private static final String LOGCAT_COMMAND = "logcat -v long";
     private static final int DEVICE_POLL_INTERVAL_MSEC = 1000;
 
-    private static final LogCatMessage sDeviceDisconnectedMsg =
+    private static final LogCatMessage S_DEVICE_DISCONNECTED_MSG =
             new LogCatMessage(LogLevel.ERROR, "Device disconnected: 1");
-    private static final LogCatMessage sConnectionTimeoutMsg =
+    private static final LogCatMessage S_CONNECTION_TIMEOUT_MSG =
             new LogCatMessage(LogLevel.ERROR, "LogCat Connection timed out");
-    private static final LogCatMessage sConnectionErrorMsg =
+    private static final LogCatMessage S_CONNECTION_ERROR_MSG =
             new LogCatMessage(LogLevel.ERROR, "LogCat Connection error");
 
     private final IDevice mDevice;
@@ -34,7 +39,7 @@ public class LogCatReceiverTask implements Runnable {
     private final AtomicBoolean mCancelled;
 
     @GuardedBy("this")
-    private final Set<LogCatListener> mListeners = new HashSet<LogCatListener>();
+    private final Set<LogCatListener> mListeners = new HashSet<>();
 
     public LogCatReceiverTask(@NonNull IDevice device) {
         mDevice = device;
@@ -56,24 +61,25 @@ public class LogCatReceiverTask implements Runnable {
         }
 
         try {
-            mDevice.executeShellCommand(LOGCAT_COMMAND, mReceiver, 0);
+            mDevice.executeShellCommand(LOGCAT_COMMAND, mReceiver, Long.MAX_VALUE, TimeUnit.DAYS);
         } catch (TimeoutException e) {
-            notifyListeners(Collections.singletonList(sConnectionTimeoutMsg));
+            notifyListeners(Collections.singletonList(S_CONNECTION_TIMEOUT_MSG));
         } catch (AdbCommandRejectedException ignored) {
             // will not be thrown as long as the shell supports logcat
         } catch (ShellCommandUnresponsiveException ignored) {
             // this will not be thrown since the last argument is 0
         } catch (IOException e) {
-            notifyListeners(Collections.singletonList(sConnectionErrorMsg));
+            notifyListeners(Collections.singletonList(S_CONNECTION_ERROR_MSG));
         }
 
-        notifyListeners(Collections.singletonList(sDeviceDisconnectedMsg));
+        notifyListeners(Collections.singletonList(S_DEVICE_DISCONNECTED_MSG));
     }
 
     public void stop() {
         mCancelled.set(true);
     }
 
+    @SuppressWarnings("WeakerAccess")
     private class LogCatOutputReceiver extends MultiLineReceiver {
         public LogCatOutputReceiver() {
             setTrimLine(false);

@@ -20,7 +20,8 @@ import org.fesaid.tools.ddmlib.log.LogReceiver;
  * <p>This currently uses spin-wait non-blocking I/O. A Selector would be more efficient,
  * but seems like overkill for what we're doing here.
  */
-@SuppressWarnings("WeakerAccess") final class AdbHelper {
+@SuppressWarnings("WeakerAccess")
+final class AdbHelper {
 
     // public static final long kOkay = 0x59414b4fL;
     // public static final long kFail = 0x4c494146L;
@@ -76,7 +77,7 @@ import org.fesaid.tools.ddmlib.log.LogReceiver;
             // if the device is not -1, then we first tell adb we're looking to
             // talk to a specific device
             setDevice(adbChan, device);
-            byte[] req = createAdbForwardRequest(null, devicePort);
+            byte[] req = createAdbForwardRequest(devicePort);
             write(adbChan, req);
             AdbResponse resp = readAdbResponse(adbChan, false);
             if (!resp.okay) {
@@ -128,17 +129,10 @@ import org.fesaid.tools.ddmlib.log.LogReceiver;
     /**
      * Creates a port forwarding request for adb. This returns an array containing "####tcp:{port}:{addStr}".
      *
-     * @param addrStr the host. Can be null.
      * @param port the port on the device. This does not need to be numeric.
      */
-    private static byte[] createAdbForwardRequest(String addrStr, int port) {
-        String reqStr;
-        if (addrStr == null) {
-            reqStr = "tcp:" + port;
-        } else {
-            reqStr = "tcp:" + port + ":" + addrStr;
-        }
-        return formAdbRequest(reqStr);
+    private static byte[] createAdbForwardRequest(int port) {
+        return formAdbRequest("tcp:" + port);
     }
 
     /**
@@ -280,17 +274,6 @@ import org.fesaid.tools.ddmlib.log.LogReceiver;
     }
 
     /**
-     * @deprecated Use {@link #executeRemoteCommand(InetSocketAddress, String, IDevice, IShellOutputReceiver, long,
-     * TimeUnit)}.
-     */
-    @Deprecated
-    static void executeRemoteCommand(InetSocketAddress adbSockAddr,
-        String command, IDevice device, IShellOutputReceiver rcvr, int maxTimeToOutputResponse)
-        throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException {
-        executeRemoteCommand(adbSockAddr, command, device, rcvr, maxTimeToOutputResponse, TimeUnit.MILLISECONDS);
-    }
-
-    /**
      * Executes a shell command on the device and retrieve the output. The output is handed to
      * <var>rcvr</var> as it arrives.
      *
@@ -402,7 +385,7 @@ import org.fesaid.tools.ddmlib.log.LogReceiver;
         AdbService adbService,
         String command,
         IDevice device,
-        @Nullable IShellOutputReceiver rcvr,
+        IShellOutputReceiver rcvr,
         long maxTimeout,
         long maxTimeToOutputResponse,
         TimeUnit maxTimeUnits,
@@ -888,7 +871,7 @@ import org.fesaid.tools.ddmlib.log.LogReceiver;
             // to a specific device
             setDevice(adbChan, device);
             write(adbChan, request);
-            AdbResponse resp = readAdbResponse(adbChan, false /* readDiagString */);
+            AdbResponse resp = readAdbResponse(adbChan, false);
             if (!resp.okay) {
                 Log.w("root", "Error setting root: " + resp.message);
                 throw new AdbCommandRejectedException(resp.message);

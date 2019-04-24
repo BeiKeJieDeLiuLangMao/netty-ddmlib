@@ -38,7 +38,7 @@ public interface IDevice extends IShellEnabledDevice {
     String PROP_DEBUGGABLE = "ro.debuggable";
 
     /** Serial number of the first connected emulator. */
-    String FIRST_EMULATOR_SN = "emulator-5554"; //$NON-NLS-1$
+    String FIRST_EMULATOR_SN = "emulator-5554"; 
     /** Device change bit mask: {@link DeviceState} change. */
     int CHANGE_STATE = 0x0001;
     /** Device change bit mask: {@link Client} list change. */
@@ -48,12 +48,20 @@ public interface IDevice extends IShellEnabledDevice {
 
     /** Device level software features. */
     enum Feature {
-        SCREEN_RECORD,      // screen recorder available?
-        PROCSTATS,          // procstats service (dumpsys procstats) available
+        /**
+         * screen recorder available?
+         */
+        SCREEN_RECORD,
+        /**
+         * procstats service (dumpsys procstats) available
+         */
+        PROCSTATS
     }
 
-    /** Device level hardware features. */
     enum HardwareFeature {
+        /**
+         * Device level hardware features.
+         */
         WATCH("watch"),
         EMBEDDED("embedded"),
         TV("tv");
@@ -69,26 +77,22 @@ public interface IDevice extends IShellEnabledDevice {
         }
     }
 
-    /** @deprecated Use {@link #PROP_BUILD_API_LEVEL}. */
-    @Deprecated
-    String PROP_BUILD_VERSION_NUMBER = PROP_BUILD_API_LEVEL;
-
-    String MNT_EXTERNAL_STORAGE = "EXTERNAL_STORAGE"; //$NON-NLS-1$
-    String MNT_ROOT = "ANDROID_ROOT"; //$NON-NLS-1$
-    String MNT_DATA = "ANDROID_DATA"; //$NON-NLS-1$
+    String MNT_EXTERNAL_STORAGE = "EXTERNAL_STORAGE"; 
+    String MNT_ROOT = "ANDROID_ROOT"; 
+    String MNT_DATA = "ANDROID_DATA"; 
 
     /**
      * The state of a device.
      */
     enum DeviceState {
-        BOOTLOADER("bootloader"), //$NON-NLS-1$
-        OFFLINE("offline"), //$NON-NLS-1$
-        ONLINE("device"), //$NON-NLS-1$
-        RECOVERY("recovery"), //$NON-NLS-1$
+        BOOTLOADER("bootloader"), 
+        OFFLINE("offline"), 
+        ONLINE("device"), 
+        RECOVERY("recovery"), 
         /** Device is in "sideload" state either through `adb sideload` or recovery menu */
-        SIDELOAD("sideload"), //$NON-NLS-1$
-        UNAUTHORIZED("unauthorized"), //$NON-NLS-1$
-        DISCONNECTED("disconnected"), //$NON-NLS-1$
+        SIDELOAD("sideload"), 
+        UNAUTHORIZED("unauthorized"), 
+        DISCONNECTED("disconnected"), 
         ;
 
         private String mState;
@@ -122,9 +126,9 @@ public interface IDevice extends IShellEnabledDevice {
      * Namespace of a Unix Domain Socket created on the device.
      */
     enum DeviceUnixSocketNamespace {
-        ABSTRACT("localabstract"),      //$NON-NLS-1$
-        FILESYSTEM("localfilesystem"),  //$NON-NLS-1$
-        RESERVED("localreserved");      //$NON-NLS-1$
+        ABSTRACT("localabstract"),      
+        FILESYSTEM("localfilesystem"),  
+        RESERVED("localreserved");      
 
         private String mType;
 
@@ -237,7 +241,6 @@ public interface IDevice extends IShellEnabledDevice {
      * Returns a mount point.
      *
      * @param name the name of the mount point to return
-     *
      * @see #MNT_EXTERNAL_STORAGE
      * @see #MNT_ROOT
      * @see #MNT_DATA
@@ -330,15 +333,6 @@ public interface IDevice extends IShellEnabledDevice {
             ShellCommandUnresponsiveException;
 
     /**
-     * @deprecated Use {@link #executeShellCommand(String, IShellOutputReceiver, long, TimeUnit)}.
-     */
-    @Deprecated
-    void executeShellCommand(String command, IShellOutputReceiver receiver,
-                             int maxTimeToOutputResponse)
-            throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
-            IOException;
-
-    /**
      * Executes a shell command on the device, and sends the result to a <var>receiver</var>
      * <p>This is similar to calling
      * <code>executeShellCommand(command, receiver, DdmPreferences.getTimeOut())</code>.
@@ -352,24 +346,35 @@ public interface IDevice extends IShellEnabledDevice {
      *            for a given time.
      * @throws IOException in case of I/O error on the connection.
      *
-     * @see #executeShellCommand(String, IShellOutputReceiver, int)
      * @see DdmPreferences#getTimeOut()
      */
     void executeShellCommand(String command, IShellOutputReceiver receiver)
             throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
             IOException;
 
-    /** A version of executeShell command that can take an input stream to send through stdin. */
-    default void executeShellCommand(
+    /**
+     *
+     * A version of executeShell command that can take an input stream to send through stdin.
+     *
+     * @param command the shell command to execute
+     * @param receiver the {@link IShellOutputReceiver} that will receives the output of the shell command
+     * @param maxTimeToOutputResponse timeout
+     * @param maxTimeUnits timeout unit
+     * @param is stdin
+     * @throws TimeoutException in case of timeout on the connection.
+     * @throws AdbCommandRejectedException if adb rejects the command
+     * @throws ShellCommandUnresponsiveException in case the shell command doesn't send output
+     *            for a given time.
+     * @throws IOException in case of I/O error on the connection.
+     */
+    void executeShellCommand(
             String command,
             IShellOutputReceiver receiver,
             long maxTimeToOutputResponse,
             TimeUnit maxTimeUnits,
             @Nullable InputStream is)
             throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
-                    IOException {
-        throw new UnsupportedOperationException();
-    }
+                    IOException;
 
     String execute(String command) throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
         IOException;

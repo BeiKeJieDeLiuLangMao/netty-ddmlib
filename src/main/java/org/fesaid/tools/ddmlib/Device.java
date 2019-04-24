@@ -28,12 +28,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.fesaid.tools.ddmlib.log.LogReceiver;
 
+import static com.android.sdklib.AndroidVersion.VersionCodes.KITKAT;
+
 /**
  * A Device. It can be a physical device or an emulator.
  */
 final class Device implements IDevice {
     /** Emulator Serial Number regexp. */
     static final String RE_EMULATOR_SN = "emulator-(\\d+)";
+    private static final String ZERO = "0";
+    private static final int SCREEN_RECORDER_MAX_TIME_LIMIT = 180;
 
     /** Serial number of the device */
     private final String mSerialNumber;
@@ -102,10 +106,6 @@ final class Device implements IDevice {
     @Nullable private AndroidVersion mVersion;
     private String mName;
 
-    /*
-     * (non-Javadoc)
-     * @see IDevice#getSerialNumber()
-     */
     @NonNull
     @Override
     public String getSerialNumber() {
@@ -200,10 +200,6 @@ final class Device implements IDevice {
         return sb.toString();
     }
 
-    /*
-     * (non-Javadoc)
-     * @see IDevice#getState()
-     */
     @Override
     public DeviceState getState() {
         return mState;
@@ -279,23 +275,25 @@ final class Device implements IDevice {
     public boolean supportsFeature(@NonNull Feature feature) {
         switch (feature) {
             case SCREEN_RECORD:
-                if (!getVersion().isGreaterOrEqualThan(19)) {
+                if (!getVersion().isGreaterOrEqualThan(KITKAT)) {
                     return false;
                 }
                 if (mHasScreenRecorder == null) {
-                    mHasScreenRecorder = hasBinary(SCREEN_RECORDER_DEVICE_PATH);
+                    mHasScreenRecorder = hasBinary();
                 }
                 return mHasScreenRecorder;
             case PROCSTATS:
-                return getVersion().isGreaterOrEqualThan(19);
+                return getVersion().isGreaterOrEqualThan(KITKAT);
             default:
                 return false;
         }
     }
 
-    // The full list of features can be obtained from /etc/permissions/features*
-    // However, the smaller set of features we are interested in can be obtained by
-    // reading the build characteristics property.
+    /**
+     *  The full list of features can be obtained from /etc/permissions/features*
+     *  However, the smaller set of features we are interested in can be obtained by
+     *  reading the build characteristics property.
+     */
     @Override
     public boolean supportsFeature(@NonNull HardwareFeature feature) {
         if (mHardwareCharacteristics == null) {
@@ -349,11 +347,11 @@ final class Device implements IDevice {
         return receiver.getVersionName();
     }
 
-    private boolean hasBinary(String path) {
+    private boolean hasBinary() {
         CountDownLatch latch = new CountDownLatch(1);
         CollectingOutputReceiver receiver = new CollectingOutputReceiver(latch);
         try {
-            executeShellCommand("ls " + path, receiver, LS_TIMEOUT_SEC, TimeUnit.SECONDS);
+            executeShellCommand("ls " + Device.SCREEN_RECORDER_DEVICE_PATH, receiver, LS_TIMEOUT_SEC, TimeUnit.SECONDS);
         } catch (Exception e) {
             return false;
         }
@@ -417,46 +415,27 @@ final class Device implements IDevice {
         return mSerialNumber;
     }
 
-    /*
-     * (non-Javadoc)
-     * @see IDevice#isOnline()
-     */
     @Override
     public boolean isOnline() {
         return mState == DeviceState.ONLINE;
     }
 
-    /*
-     * (non-Javadoc)
-     * @see IDevice#isEmulator()
-     */
     @Override
     public boolean isEmulator() {
         return mSerialNumber.matches(RE_EMULATOR_SN);
     }
 
-    /*
-     * (non-Javadoc)
-     * @see IDevice#isOffline()
-     */
     @Override
     public boolean isOffline() {
         return mState == DeviceState.OFFLINE;
     }
 
-    /*
-     * (non-Javadoc)
-     * @see IDevice#isBootLoader()
-     */
     @Override
     public boolean isBootLoader() {
         return mState == DeviceState.BOOTLOADER;
     }
 
-    /*
-     * (non-Javadoc)
-     * @see IDevice#getSyncService()
-     */
+
     @Override
     public SyncService getSyncService()
         throws TimeoutException, AdbCommandRejectedException, IOException {
@@ -468,10 +447,6 @@ final class Device implements IDevice {
         return null;
     }
 
-    /*
-     * (non-Javadoc)
-     * @see IDevice#getFileListingService()
-     */
     @Override
     public FileListingService getFileListingService() {
         return new FileListingService(this);
@@ -499,7 +474,7 @@ final class Device implements IDevice {
     }
 
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
-    static String getScreenRecorderCommand(@NonNull String remoteFilePath,
+    private static String getScreenRecorderCommand(@NonNull String remoteFilePath,
         @NonNull ScreenRecorderOptions options) {
         StringBuilder sb = new StringBuilder();
 
@@ -523,8 +498,8 @@ final class Device implements IDevice {
         if (options.timeLimit > 0) {
             sb.append("--time-limit ");
             long seconds = TimeUnit.SECONDS.convert(options.timeLimit, options.timeLimitUnits);
-            if (seconds > 180) {
-                seconds = 180;
+            if (seconds > SCREEN_RECORDER_MAX_TIME_LIMIT) {
+                seconds = SCREEN_RECORDER_MAX_TIME_LIMIT;
             }
             sb.append(seconds);
             sb.append(' ');
@@ -540,7 +515,7 @@ final class Device implements IDevice {
         throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
         IOException {
         AdbHelper.executeRemoteCommand(AndroidDebugBridge.getSocketAddress(), command, this,
-            receiver, DdmPreferences.getTimeOut());
+            receiver, DdmPreferences.getTimeOut(), TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -575,15 +550,6 @@ final class Device implements IDevice {
         SingleLineReceiver singleLineReceiver = new SingleLineReceiver();
         executeShellCommand(command, singleLineReceiver);
         return singleLineReceiver.get(timeout, timeUnit);
-    }
-
-    @Override
-    public void executeShellCommand(String command, IShellOutputReceiver receiver,
-        int maxTimeToOutputResponse)
-        throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
-        IOException {
-        AdbHelper.executeRemoteCommand(AndroidDebugBridge.getSocketAddress(), command, this,
-            receiver, maxTimeToOutputResponse);
     }
 
     @Override
@@ -769,10 +735,6 @@ final class Device implements IDevice {
     void update(@NonNull Client client, int changeMask) {
         AndroidDebugBridge.clientChanged(client, changeMask);
         updateClientInfo(client, changeMask);
-    }
-
-    void setMountingPoint(String name, String value) {
-        mMountPoints.put(name, value);
     }
 
     private void addClientInfo(Client client) {
@@ -1225,7 +1187,7 @@ final class Device implements IDevice {
         executeShellCommand(
             "echo $USER_ID", receiver, QUERY_IS_ROOT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         String userID = receiver.getOutput().trim();
-        mIsRoot = userID.equals("0");
+        mIsRoot = userID.equals(ZERO);
         return mIsRoot;
     }
 
