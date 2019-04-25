@@ -25,7 +25,7 @@ public class AdbConnection implements Closeable {
         this.channel = channel;
     }
 
-    public synchronized AdbRespondHandler sendAndWaitResponse(String message, long timeout,
+    public synchronized void sendAndWaitSuccess(String message, long timeout,
         TimeUnit timeUnit, AdbInputHandler... nextHandlers) throws TimeoutException, AdbCommandRejectedException {
         AdbRespondHandler adbRespondHandler = new AdbRespondHandler();
         channel.pipeline().addLast(adbRespondHandler);
@@ -34,7 +34,9 @@ public class AdbConnection implements Closeable {
         }
         send(message, timeout, timeUnit);
         adbRespondHandler.waitRespond(timeout, timeUnit);
-        return adbRespondHandler;
+        if (!adbRespondHandler.getOkay()) {
+            throw new AdbCommandRejectedException(adbRespondHandler.getMessage());
+        }
     }
 
     public synchronized void send(String message, long timeout, TimeUnit timeUnit) throws TimeoutException,

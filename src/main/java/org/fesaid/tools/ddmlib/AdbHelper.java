@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +17,6 @@ import org.fesaid.tools.ddmlib.netty.AdbConnection;
 import org.fesaid.tools.ddmlib.netty.AdbConnector;
 import org.fesaid.tools.ddmlib.netty.AdbNettyConfig;
 import org.fesaid.tools.ddmlib.netty.input.AdbFrameHandler;
-import org.fesaid.tools.ddmlib.netty.input.AdbRespondHandler;
 import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
 
 /**
@@ -195,18 +193,15 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
      */
     static RawImage getFrameBuffer(InetSocketAddress adbSockAddr, Device device, long timeout, TimeUnit unit)
         throws TimeoutException, AdbCommandRejectedException, IOException {
-        try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())){
+        try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())) {
             setDevice(adbConnection, device);
             AdbFrameHandler adbFrameHandler = new AdbFrameHandler();
-            AdbRespondHandler respondHandler = adbConnection.sendAndWaitResponse(
+            adbConnection.sendAndWaitSuccess(
                 "framebuffer:",
                 DdmPreferences.getTimeOut(),
                 TimeUnit.MILLISECONDS,
                 adbFrameHandler
             );
-            if (!respondHandler.getOkay()) {
-                throw new AdbCommandRejectedException(respondHandler.getMessage());
-            }
             return adbFrameHandler.waitFrameData(timeout, unit);
         }
     }
@@ -272,11 +267,12 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
      * @throws IOException in case of I/O error on the connection.
      * @see DdmPreferences#getTimeOut()
      */
+    @SuppressWarnings("SameParameterValue")
     static void executeRemoteCommand(InetSocketAddress adbSockAddr,
         String command, IDevice device, IShellOutputReceiver rcvr, long maxTimeToOutputResponse, TimeUnit maxTimeUnits)
         throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException {
-        executeRemoteCommand(adbSockAddr, AdbService.SHELL, command, device, rcvr, maxTimeToOutputResponse,
-            maxTimeUnits, null);
+        executeRemoteCommand(adbSockAddr, AdbService.SHELL, command, device, rcvr, maxTimeToOutputResponse, maxTimeUnits,
+            null);
     }
 
     /**
@@ -328,13 +324,10 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
             // talk to a specific device
             setDevice(adbConnection, device);
             AdbStreamInputHandler customRespondHandler = new AdbStreamInputHandler(rcvr);
-            AdbRespondHandler respondHandler = adbConnection.sendAndWaitResponse(
+            adbConnection.sendAndWaitSuccess(
                 adbService.name().toLowerCase() + ":" + command,
                 DdmPreferences.getTimeOut(),
                 TimeUnit.MILLISECONDS, customRespondHandler);
-            if (!respondHandler.getOkay()) {
-                throw new AdbCommandRejectedException(respondHandler.getMessage());
-            }
             // stream the input file if present.
             if (!Objects.isNull(is)) {
                 adbConnection.send(is);
@@ -420,45 +413,16 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
      */
     public static void runLogService(InetSocketAddress adbSockAddr, Device device, String logName,
         LogReceiver rcvr) throws TimeoutException, AdbCommandRejectedException, IOException {
-        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
-            adbChan.configureBlocking(false);
-
-            // if the device is not -1, then we first tell adb we're looking to talk
-            // to a specific device
-            setDevice(adbChan, device);
-
-            byte[] request = formAdbRequest("log:" + logName);
-            write(adbChan, request);
-
-            AdbResponse resp = readAdbResponse(adbChan);
-            if (!resp.okay) {
-                throw new AdbCommandRejectedException(resp.message);
-            }
-            byte[] data = new byte[16384];
-            ByteBuffer buf = ByteBuffer.wrap(data);
-            while (true) {
-                int count;
-                if (rcvr != null && rcvr.isCancelled()) {
-                    break;
-                }
-                count = adbChan.read(buf);
-                if (count < 0) {
-                    break;
-                } else if (count == 0) {
-                    try {
-                        Thread.sleep(WAIT_TIME * 5);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        // Throw a timeout exception in place of interrupted exception to avoid API changes.
-                        throw new TimeoutException("runLogService interrupted with immediate timeout via interruption.");
-                    }
-                } else {
-                    if (rcvr != null) {
-                        rcvr.parseNewData(buf.array(), buf.arrayOffset(), buf.position());
-                    }
-                    buf.rewind();
-                }
-            }
+        try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())) {
+            setDevice(adbConnection, device);
+            AdbStreamInputHandler customHandler = new AdbStreamInputHandler(rcvr);
+            adbConnection.sendAndWaitSuccess(
+                "log:" + logName,
+                DdmPreferences.getTimeOut(),
+                TimeUnit.MILLISECONDS,
+                customHandler
+            );
+            customHandler.waitFinish(0, null);
         }
     }
 
@@ -479,13 +443,10 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
         String localPortSpec, String remotePortSpec)
         throws TimeoutException, AdbCommandRejectedException, IOException {
         try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())) {
-            AdbRespondHandler respondHandler = adbConnection.sendAndWaitResponse(
+            adbConnection.sendAndWaitSuccess(
                 String.format("host-serial:%1$s:forward:%2$s;%3$s", device.getSerialNumber(), localPortSpec, remotePortSpec),
                 DdmPreferences.getTimeOut(),
                 TimeUnit.MILLISECONDS);
-            if (!respondHandler.getOkay()) {
-                throw new AdbCommandRejectedException(respondHandler.getMessage());
-            }
         }
     }
 
@@ -503,13 +464,10 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
         String localPortSpec)
         throws TimeoutException, AdbCommandRejectedException, IOException {
         try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())) {
-            AdbRespondHandler respondHandler = adbConnection.sendAndWaitResponse(
+            adbConnection.sendAndWaitSuccess(
                 String.format("host-serial:%1$s:killforward:%2$s", device.getSerialNumber(), localPortSpec),
                 DdmPreferences.getTimeOut(),
                 TimeUnit.MILLISECONDS);
-            if (!respondHandler.getOkay()) {
-                throw new AdbCommandRejectedException(respondHandler.getMessage());
-            }
         }
     }
 
@@ -676,13 +634,10 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
         // if the device is not -1, then we first tell adb we're looking to talk
         // to a specific device
         if (device != null) {
-            AdbRespondHandler adbRespondHandler = adbConnection.sendAndWaitResponse(
+            adbConnection.sendAndWaitSuccess(
                 "host:transport:" + device.getSerialNumber(),
                 DdmPreferences.getTimeOut(),
                 TimeUnit.MILLISECONDS);
-            if (!adbRespondHandler.getOkay()) {
-                throw new AdbCommandRejectedException(adbRespondHandler.getMessage(), true);
-            }
         }
     }
 
@@ -721,11 +676,7 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
         throws TimeoutException, AdbCommandRejectedException, IOException {
         try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())) {
             setDevice(adbConnection, device);
-            AdbRespondHandler respondHandler = adbConnection.sendAndWaitResponse(
-                "root:", DdmPreferences.getTimeOut(), TimeUnit.MILLISECONDS);
-            if (!respondHandler.getOkay()) {
-                throw new AdbCommandRejectedException(respondHandler.getMessage());
-            }
+            adbConnection.sendAndWaitSuccess("root:", DdmPreferences.getTimeOut(), TimeUnit.MILLISECONDS);
         }
     }
 }
