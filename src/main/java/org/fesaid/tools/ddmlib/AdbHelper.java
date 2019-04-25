@@ -17,6 +17,7 @@ import org.fesaid.tools.ddmlib.log.LogReceiver;
 import org.fesaid.tools.ddmlib.netty.AdbConnection;
 import org.fesaid.tools.ddmlib.netty.AdbConnector;
 import org.fesaid.tools.ddmlib.netty.AdbNettyConfig;
+import org.fesaid.tools.ddmlib.netty.input.AdbFrameHandler;
 import org.fesaid.tools.ddmlib.netty.input.AdbRespondHandler;
 import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
 
@@ -194,50 +195,20 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
      */
     static RawImage getFrameBuffer(InetSocketAddress adbSockAddr, Device device, long timeout, TimeUnit unit)
         throws TimeoutException, AdbCommandRejectedException, IOException {
-        RawImage imageParams = new RawImage();
-        byte[] request = formAdbRequest("framebuffer:");
-        byte[] nudge = {
-            0
-        };
-        byte[] reply;
-        try (SocketChannel adbChan = SocketChannel.open(adbSockAddr)) {
-            adbChan.configureBlocking(false);
-            // if the device is not -1, then we first tell adb we're looking to talk
-            // to a specific device
-            setDevice(adbChan, device);
-            write(adbChan, request);
-            AdbResponse resp = readAdbResponse(adbChan);
-            if (!resp.okay) {
-                throw new AdbCommandRejectedException(resp.message);
+        try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())){
+            setDevice(adbConnection, device);
+            AdbFrameHandler adbFrameHandler = new AdbFrameHandler();
+            AdbRespondHandler respondHandler = adbConnection.sendAndWaitResponse(
+                "framebuffer:",
+                DdmPreferences.getTimeOut(),
+                TimeUnit.MILLISECONDS,
+                adbFrameHandler
+            );
+            if (!respondHandler.getOkay()) {
+                throw new AdbCommandRejectedException(respondHandler.getMessage());
             }
-            // first the protocol version.
-            reply = new byte[4];
-            read(adbChan, reply);
-            ByteBuffer buf = ByteBuffer.wrap(reply);
-            buf.order(ByteOrder.LITTLE_ENDIAN);
-            int version = buf.getInt();
-            // get the header size (this is a count of int)
-            int headerSize = RawImage.getHeaderSize(version);
-            // read the header
-            reply = new byte[headerSize * 4];
-            read(adbChan, reply);
-            buf = ByteBuffer.wrap(reply);
-            buf.order(ByteOrder.LITTLE_ENDIAN);
-            // fill the RawImage with the header
-            if (!imageParams.readHeader(version, buf)) {
-                Log.e("Screenshot", "Unsupported protocol: " + version);
-                return null;
-            }
-            Log.d("ddms", "image params: bpp=" + imageParams.bpp + ", size="
-                + imageParams.size + ", width=" + imageParams.width
-                + ", height=" + imageParams.height);
-
-            write(adbChan, nudge);
-            reply = new byte[imageParams.size];
-            read(adbChan, reply, imageParams.size, unit.toMillis(timeout));
-            imageParams.data = reply;
+            return adbFrameHandler.waitFrameData(timeout, unit);
         }
-        return imageParams;
     }
 
     /**
