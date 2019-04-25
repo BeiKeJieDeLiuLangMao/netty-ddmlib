@@ -74,15 +74,6 @@ public class AdbRespondHandler extends ChannelInboundHandlerAdapter implements A
         respondCountDown.countDown();
     }
 
-    @Override
-    public void channelInactive(ChannelHandlerContext ctx) {
-        if (respondCountDown.getCount() > 0) {
-            okay = false;
-            message = "Connection inactive";
-            respondCountDown.countDown();
-        }
-    }
-
     private void finishRead(ChannelHandlerContext ctx, Object msg) {
         respondCountDown.countDown();
         unhandledData(ctx, msg);
