@@ -3,13 +3,15 @@ package org.fesaid.tools.ddmlib;
 
 /**
  * Exception thrown when adb refuses a command.
+ * @author AOSP
  */
+@SuppressWarnings("unused")
 public class AdbCommandRejectedException extends Exception {
     private static final long serialVersionUID = 1L;
     private final boolean mIsDeviceOffline;
     private final boolean mErrorDuringDeviceSelection;
 
-    AdbCommandRejectedException(String message) {
+    public AdbCommandRejectedException(String message) {
         super(message);
         mIsDeviceOffline = "device offline".equals(message);
         mErrorDuringDeviceSelection = false;

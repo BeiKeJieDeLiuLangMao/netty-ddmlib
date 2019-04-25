@@ -1,4 +1,4 @@
-package org.fesaid.tools.ddmlib.netty;
+package org.fesaid.tools.ddmlib.netty.output;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -10,7 +10,7 @@ import static io.netty.handler.codec.http.HttpConstants.DEFAULT_CHARSET;
 /**
  * @author Chen Yang/CL10060-N/chen.yang@linecorp.com
  */
-public class AdbRequestHandler extends MessageToMessageEncoder<String> {
+public class AdbStringOutputHandler extends MessageToMessageEncoder<String> implements AdbOutputHandler<String> {
 
     @Override
     protected void encode(ChannelHandlerContext ctx, String msg, List<Object> out) {

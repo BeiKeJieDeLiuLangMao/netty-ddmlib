@@ -14,11 +14,13 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Chen Yang/CL10060-N/chen.yang@linecorp.com
  */
 @ChannelHandler.Sharable
+@Slf4j
 public class AdbConnector extends ChannelDuplexHandler {
     private final AdbNettyConfig config;
     private final Bootstrap bootstrap;
@@ -44,9 +46,8 @@ public class AdbConnector extends ChannelDuplexHandler {
                 throw new IOException("connect failed, can not connect to component.", f.cause());
             } else {
                 injectTrafficHandler(f.channel(), serialnumber);
-                AdbConnection adbConnection = new AdbConnection(f.channel());
                 f.channel().pipeline().remove(this);
-                return adbConnection;
+                return new AdbConnection(f.channel());
             }
         } catch (Exception e) {
             throw new IOException("can not connect to component.", e);

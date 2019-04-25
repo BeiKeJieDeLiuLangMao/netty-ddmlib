@@ -10,13 +10,15 @@ import java.nio.ByteOrder;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.fesaid.tools.ddmlib.log.LogReceiver;
 import org.fesaid.tools.ddmlib.netty.AdbConnection;
-import org.fesaid.tools.ddmlib.netty.AdbNettyConfig;
 import org.fesaid.tools.ddmlib.netty.AdbConnector;
-import org.fesaid.tools.ddmlib.netty.AdbRespondHandler;
+import org.fesaid.tools.ddmlib.netty.AdbNettyConfig;
+import org.fesaid.tools.ddmlib.netty.input.AdbRespondHandler;
+import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
 
 /**
  * Helper class to handle requests and connections to adb.
@@ -26,8 +28,7 @@ import org.fesaid.tools.ddmlib.netty.AdbRespondHandler;
  * but seems like overkill for what we're doing here.
  */
 @SuppressWarnings({"WeakerAccess"})
-@Slf4j
-final class AdbHelper {
+@Slf4j final class AdbHelper {
 
     // public static final long kOkay = 0x59414b4fL;
     // public static final long kFail = 0x4c494146L;
@@ -346,127 +347,29 @@ final class AdbHelper {
      * @throws IOException in case of I/O error on the connection.
      * @see DdmPreferences#getTimeOut()
      */
-    static void executeRemoteCommand(
-        InetSocketAddress adbSockAddr,
-        AdbService adbService,
-        String command,
-        IDevice device,
-        IShellOutputReceiver rcvr,
-        long maxTimeout,
-        long maxTimeToOutputResponse,
-        TimeUnit maxTimeUnits,
-        @Nullable InputStream is)
-        throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
-        IOException {
-
-        long maxTimeToOutputMs = 0;
-        if (maxTimeToOutputResponse > 0) {
-            if (maxTimeUnits == null) {
-                throw new NullPointerException("Time unit must not be null for non-zero max.");
-            }
-            maxTimeToOutputMs = maxTimeUnits.toMillis(maxTimeToOutputResponse);
-        }
-        long maxTimeoutMs = 0L;
-        if (maxTimeout > 0L) {
-            if (maxTimeUnits == null) {
-                throw new NullPointerException("Time unit must not be null for non-zero max.");
-            }
-            maxTimeoutMs = maxTimeUnits.toMillis(maxTimeout);
-        }
-
-        Log.v("ddms", "execute: running " + command);
-
-        SocketChannel adbChan = null;
-        try {
-            long startTime = System.currentTimeMillis();
-            adbChan = SocketChannel.open(adbSockAddr);
-            adbChan.configureBlocking(false);
-
+    static void executeRemoteCommand(InetSocketAddress adbSockAddr, AdbService adbService, String command,
+        IDevice device, IShellOutputReceiver rcvr, long maxTimeout, long maxTimeToOutputResponse, TimeUnit maxTimeUnits,
+        @Nullable InputStream is) throws TimeoutException, AdbCommandRejectedException,
+        ShellCommandUnresponsiveException, IOException {
+        log.debug("Adb execute command: " + command);
+        try (AdbConnection adbConnection = adbConnector.connect(adbSockAddr, device.getSerialNumber())) {
             // if the device is not -1, then we first tell adb we're looking to
             // talk to a specific device
-            setDevice(adbChan, device);
-
-            byte[] request = formAdbRequest(adbService.name().toLowerCase() + ":" + command);
-            write(adbChan, request);
-
-            AdbResponse resp = readAdbResponse(adbChan);
-            if (!resp.okay) {
-                Log.e("ddms", "ADB rejected shell command (" + command + "): " + resp.message);
-                throw new AdbCommandRejectedException(resp.message);
+            setDevice(adbConnection, device);
+            AdbStreamInputHandler customRespondHandler = new AdbStreamInputHandler(rcvr);
+            AdbRespondHandler respondHandler = adbConnection.sendAndWaitResponse(
+                adbService.name().toLowerCase() + ":" + command,
+                DdmPreferences.getTimeOut(),
+                TimeUnit.MILLISECONDS, customRespondHandler);
+            if (!respondHandler.getOkay()) {
+                throw new AdbCommandRejectedException(respondHandler.getMessage());
             }
-
-            byte[] data = new byte[16384];
-
             // stream the input file if present.
-            if (is != null) {
-                int read;
-                while ((read = is.read(data)) != -1) {
-                    ByteBuffer buf = ByteBuffer.wrap(data, 0, read);
-                    int written = 0;
-                    while (buf.hasRemaining()) {
-                        written += adbChan.write(buf);
-                    }
-                    if (written != read) {
-                        Log.e("ddms",
-                            "ADB write inconsistency, wrote " + written + "expected " + read);
-                        throw new AdbCommandRejectedException("write failed");
-                    }
-                }
+            if (!Objects.isNull(is)) {
+                adbConnection.send(is);
             }
-
-            ByteBuffer buf = ByteBuffer.wrap(data);
-            buf.clear();
-            long timeToResponseCount = 0;
-            while (true) {
-                int count;
-
-                if (rcvr != null && rcvr.isCancelled()) {
-                    Log.v("ddms", "execute: cancelled");
-                    break;
-                }
-
-                count = adbChan.read(buf);
-                if (count < 0) {
-                    // we're at the end, we flush the output
-                    rcvr.flush();
-                    Log.v("ddms", "execute '" + command + "' on '" + device + "' : EOF hit. Read: "
-                        + count);
-                    break;
-                } else if (count == 0) {
-                    try {
-                        int wait = WAIT_TIME * 5;
-                        timeToResponseCount += wait;
-                        if (maxTimeToOutputMs > 0 && timeToResponseCount > maxTimeToOutputMs) {
-                            throw new ShellCommandUnresponsiveException();
-                        }
-                        Thread.sleep(wait);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        // Throw a timeout exception in place of interrupted exception to avoid API changes.
-                        throw new TimeoutException("executeRemoteCommand interrupted with immediate timeout via interruption.");
-                    }
-                } else {
-                    // reset timeout
-                    timeToResponseCount = 0;
-
-                    // send data to receiver if present
-                    if (rcvr != null) {
-                        rcvr.addOutput(buf.array(), buf.arrayOffset(), buf.position());
-                    }
-                    buf.rewind();
-                }
-                // if the overall timeout exists and is exceeded, we throw timeout exception.
-                if (maxTimeoutMs > 0 && System.currentTimeMillis() - startTime > maxTimeoutMs) {
-                    throw new TimeoutException(
-                        String.format(
-                            "executeRemoteCommand timed out after %sms", maxTimeoutMs));
-                }
-            }
-        } finally {
-            if (adbChan != null) {
-                adbChan.close();
-            }
-            Log.v("ddms", "execute: returning");
+            customRespondHandler.waitResponseBegin(maxTimeToOutputResponse, maxTimeUnits);
+            customRespondHandler.waitFinish(maxTimeout, maxTimeUnits);
         }
     }
 
@@ -830,7 +733,7 @@ final class AdbHelper {
             } else {
                 message = "reboot:" + into;
             }
-            adbConnection.send(message);
+            adbConnection.send(message, DdmPreferences.getTimeOut(), TimeUnit.MILLISECONDS);
         }
     }
 

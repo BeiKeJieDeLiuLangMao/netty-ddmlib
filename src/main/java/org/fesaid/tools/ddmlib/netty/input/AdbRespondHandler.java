@@ -1,4 +1,4 @@
-package org.fesaid.tools.ddmlib.netty;
+package org.fesaid.tools.ddmlib.netty.input;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -16,7 +16,7 @@ import static io.netty.handler.codec.http.HttpConstants.DEFAULT_CHARSET;
  * @author Chen Yang/CL10060-N/chen.yang@linecorp.com
  */
 @Slf4j
-public class AdbRespondHandler extends ChannelInboundHandlerAdapter {
+public class AdbRespondHandler extends ChannelInboundHandlerAdapter implements AdbInputHandler {
 
     private static final int OKAY_SIZE = 4;
     private static final int MESSAGE_LENGTH = 4;
@@ -63,7 +63,7 @@ public class AdbRespondHandler extends ChannelInboundHandlerAdapter {
                 }
             }
         } else {
-            ctx.fireChannelRead(msg);
+            unhandledData(ctx, msg);
         }
     }
 
@@ -76,15 +76,19 @@ public class AdbRespondHandler extends ChannelInboundHandlerAdapter {
 
     private void finishRead(ChannelHandlerContext ctx, Object msg) {
         respondCountDown.countDown();
-        ctx.fireChannelRead(msg);
+        unhandledData(ctx, msg);
     }
 
-    void waitRespond(long timeout, TimeUnit timeUnit) throws TimeoutException {
+    public void waitRespond(long timeout, TimeUnit timeUnit) throws TimeoutException {
         try {
-            if (!respondCountDown.await(timeout, timeUnit)) {
-                throw new TimeoutException("Wait response timeout.");
+            if (timeout > 0) {
+                if (!respondCountDown.await(timeout, timeUnit)) {
+                    throw new TimeoutException("Wait response timeout.");
+                }
+            } else {
+                respondCountDown.await();
             }
-        }catch (InterruptedException e) {
+        } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted", e);
         }
     }

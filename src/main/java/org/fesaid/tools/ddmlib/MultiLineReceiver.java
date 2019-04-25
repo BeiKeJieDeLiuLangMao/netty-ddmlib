@@ -13,6 +13,7 @@ import java.util.Collection;
  *
  * <p>Classes extending it must implement {@link #processNewLines(String[])} which receives new
  * parsed lines as they become available.
+ * @author AOSP
  */
 public abstract class MultiLineReceiver implements IShellOutputReceiver {
 
@@ -32,10 +33,6 @@ public abstract class MultiLineReceiver implements IShellOutputReceiver {
         mTrimLines = trim;
     }
 
-    /* (non-Javadoc)
-     * @see com.android.ddmlib.adb.IShellOutputReceiver#addOutput(
-     *      byte[], int, int)
-     */
     @Override
     public final void addOutput(byte[] data, int offset, int length) {
         if (!isCancelled()) {
@@ -52,10 +49,10 @@ public abstract class MultiLineReceiver implements IShellOutputReceiver {
             mArray.clear();
             int start = 0;
             do {
-                int index = s.indexOf('\n', start); // $NON-NLS-1$
+                int index = s.indexOf('\n', start);
 
-                // if \n was not found, this is an unfinished line
-                // and we store it to be processed for the next packet
+                // if \n was not found, this is an unfinished line and we store it to be processed for the next packet
+
                 if (index == -1) {
                     mUnfinishedLine = s.substring(start);
                     break;
@@ -90,9 +87,6 @@ public abstract class MultiLineReceiver implements IShellOutputReceiver {
         }
     }
 
-    /* (non-Javadoc)
-     * @see com.android.ddmlib.adb.IShellOutputReceiver#flush()
-     */
     @Override
     public void flush() {
         if (mUnfinishedLine != null) {
