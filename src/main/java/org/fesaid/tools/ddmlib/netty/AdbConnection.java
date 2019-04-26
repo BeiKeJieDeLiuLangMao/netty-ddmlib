@@ -1,5 +1,6 @@
 package org.fesaid.tools.ddmlib.netty;
 
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import java.io.Closeable;
@@ -32,11 +33,36 @@ public class AdbConnection implements Closeable {
         if (nextHandlers != null && nextHandlers.length > 0) {
             channel.pipeline().addLast(nextHandlers);
         }
-        send(message, timeout, timeUnit);
-        adbRespondHandler.waitRespond(timeout, timeUnit);
-        if (!adbRespondHandler.getOkay()) {
-            throw new AdbCommandRejectedException(adbRespondHandler.getMessage());
+        try {
+            send(message, timeout, timeUnit);
+            adbRespondHandler.waitRespond(timeout, timeUnit);
+            if (!adbRespondHandler.getOkay()) {
+                throw new AdbCommandRejectedException(adbRespondHandler.getMessage());
+            }
+        } finally {
+            channel.pipeline().remove(adbRespondHandler);
         }
+    }
+
+    public synchronized void syncSendAndHandle(byte[] bytes, AdbInputHandler handler, long timeout, TimeUnit timeUnit) {
+        channel.pipeline().addLast(handler);
+        syncSend(bytes, 0, bytes.length, timeout, timeUnit);
+    }
+
+    public synchronized void syncSend(byte[] bytes, int offset, int length, long timeout, TimeUnit timeUnit) {
+        try {
+            if (timeout > 0) {
+                channel.writeAndFlush(Unpooled.wrappedBuffer(bytes, offset, length)).await(timeout, timeUnit);
+            } else {
+                channel.writeAndFlush(Unpooled.wrappedBuffer(bytes, offset, length)).await();
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted", e);
+        }
+    }
+
+    public synchronized void syncSend(byte[] bytes, long timeout, TimeUnit timeUnit) {
+        syncSend(bytes, 0, bytes.length, timeout, timeUnit);
     }
 
     public synchronized void send(String message, long timeout, TimeUnit timeUnit) throws TimeoutException,

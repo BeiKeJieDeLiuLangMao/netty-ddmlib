@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import lombok.extern.slf4j.Slf4j;
 import org.fesaid.tools.ddmlib.log.LogReceiver;
 
 import static com.android.sdklib.AndroidVersion.VersionCodes.KITKAT;
@@ -33,7 +34,7 @@ import static com.android.sdklib.AndroidVersion.VersionCodes.KITKAT;
 /**
  * A Device. It can be a physical device or an emulator.
  */
-final class Device implements IDevice {
+@Slf4j final class Device implements IDevice {
     /** Emulator Serial Number regexp. */
     static final String RE_EMULATOR_SN = "emulator-(\\d+)";
     private static final String ZERO = "0";
@@ -65,7 +66,6 @@ final class Device implements IDevice {
 
     private ClientTracker mClientTracer;
 
-    private static final String LOG_TAG = "Device";
     private static final char SEPARATOR = '-';
     private static final String UNKNOWN_PACKAGE = "";
 
@@ -405,7 +405,6 @@ final class Device implements IDevice {
         if (syncService.openSync()) {
             return syncService;
         }
-
         return null;
     }
 
@@ -736,32 +735,13 @@ final class Device implements IDevice {
     @Override
     public void pushFile(String local, String remote)
         throws IOException, AdbCommandRejectedException, TimeoutException, SyncException {
-        SyncService sync = null;
-        try {
+        try (SyncService sync = getSyncService()) {
             String targetFileName = getFileName(local);
-
-            Log.d(targetFileName, String.format("Uploading %1$s onto device '%2$s'",
-                targetFileName, getSerialNumber()));
-
-            sync = getSyncService();
+            log.debug(String.format("Uploading %1$s onto device '%2$s'", targetFileName, getSerialNumber()));
             if (sync != null) {
-                String message = String.format("Uploading file onto device '%1$s'",
-                    getSerialNumber());
-                Log.d(LOG_TAG, message);
                 sync.pushFile(local, remote, SyncService.getNullProgressMonitor());
             } else {
                 throw new IOException("Unable to open sync connection!");
-            }
-        } catch (TimeoutException e) {
-            Log.e(LOG_TAG, "Error during Sync: timeout.");
-            throw e;
-
-        } catch (SyncException | IOException e) {
-            Log.e(LOG_TAG, String.format("Error during Sync: %1$s", e.getMessage()));
-            throw e;
-        } finally {
-            if (sync != null) {
-                sync.close();
             }
         }
     }
@@ -769,27 +749,12 @@ final class Device implements IDevice {
     @Override
     public void pushFile(InputStream localStream, String remote,
         int mode) throws IOException, AdbCommandRejectedException, TimeoutException, SyncException {
-        SyncService sync = null;
-        try {
-            sync = getSyncService();
+        try (SyncService sync = getSyncService()) {
+            log.debug(String.format("Uploading stream onto device '%1$s'", getSerialNumber()));
             if (sync != null) {
-                String message = String.format("Uploading file onto device '%1$s'",
-                    getSerialNumber());
-                Log.d(LOG_TAG, message);
                 sync.pushFile(localStream, remote, SyncService.getNullProgressMonitor(), mode);
             } else {
                 throw new IOException("Unable to open sync connection!");
-            }
-        } catch (TimeoutException e) {
-            Log.e(LOG_TAG, "Error during Sync: timeout.");
-            throw e;
-
-        } catch (SyncException | IOException e) {
-            Log.e(LOG_TAG, String.format("Error during Sync: %1$s", e.getMessage()));
-            throw e;
-        } finally {
-            if (sync != null) {
-                sync.close();
             }
         }
     }
@@ -797,32 +762,13 @@ final class Device implements IDevice {
     @Override
     public void pullFile(String remote, String local)
         throws IOException, AdbCommandRejectedException, TimeoutException, SyncException {
-        SyncService sync = null;
-        try {
+        try (SyncService sync = getSyncService()) {
             String targetFileName = getFileName(remote);
-
-            Log.d(targetFileName, String.format("Downloading %1$s from device '%2$s'",
-                targetFileName, getSerialNumber()));
-
-            sync = getSyncService();
+            log.debug(String.format("Downloading %1$s from device '%2$s'", targetFileName, getSerialNumber()));
             if (sync != null) {
-                String message = String.format("Downloading file from device '%1$s'",
-                    getSerialNumber());
-                Log.d(LOG_TAG, message);
                 sync.pullFile(remote, local, SyncService.getNullProgressMonitor());
             } else {
                 throw new IOException("Unable to open sync connection!");
-            }
-        } catch (TimeoutException e) {
-            Log.e(LOG_TAG, "Error during Sync: timeout.");
-            throw e;
-
-        } catch (SyncException | IOException e) {
-            Log.e(LOG_TAG, String.format("Error during Sync: %1$s", e.getMessage()));
-            throw e;
-        } finally {
-            if (sync != null) {
-                sync.close();
             }
         }
     }
@@ -836,7 +782,8 @@ final class Device implements IDevice {
     }
 
     @Override
-    public void installPackage(InputStream inputStream, boolean reinstall, String... extraArgs) throws InstallException{
+    public void installPackage(InputStream inputStream, boolean reinstall,
+        String... extraArgs) throws InstallException {
         // Use default basic installReceiver
         try {
             String remoteFilePath = syncPackageToDevice(inputStream);
@@ -956,70 +903,32 @@ final class Device implements IDevice {
     @Override
     public String syncPackageToDevice(String localFilePath)
         throws IOException, AdbCommandRejectedException, TimeoutException, SyncException {
-        SyncService sync = null;
-        try {
+        try (SyncService sync = getSyncService()) {
             String packageFileName = getFileName(localFilePath);
             String remoteFilePath = String.format("/data/local/tmp/%1$s", packageFileName);
-
-            Log.d(packageFileName, String.format("Uploading %1$s onto device '%2$s'",
-                packageFileName, getSerialNumber()));
-
-            sync = getSyncService();
+            log.debug(String.format("Uploading %1$s onto device '%2$s'", packageFileName, getSerialNumber()));
             if (sync != null) {
-                String message = String.format("Uploading file onto device '%1$s'",
-                    getSerialNumber());
-                Log.d(LOG_TAG, message);
                 sync.pushFile(localFilePath, remoteFilePath, SyncService.getNullProgressMonitor());
             } else {
                 throw new IOException("Unable to open sync connection!");
             }
             return remoteFilePath;
-        } catch (TimeoutException e) {
-            Log.e(LOG_TAG, "Error during Sync: timeout.");
-            throw e;
-
-        } catch (SyncException | IOException e) {
-            Log.e(LOG_TAG, String.format("Error during Sync: %1$s", e.getMessage()));
-            throw e;
-        } finally {
-            if (sync != null) {
-                sync.close();
-            }
         }
     }
 
     @Override
     public String syncPackageToDevice(InputStream localFileStream) throws TimeoutException, AdbCommandRejectedException,
         IOException, SyncException {
-        SyncService sync = null;
-        try {
+        try (SyncService sync = getSyncService()) {
             String packageFileName = getFileName(localFileStream.toString());
             String remoteFilePath = String.format("/data/local/tmp/%1$s", packageFileName);
-
-            Log.d(packageFileName, String.format("Uploading %1$s onto device '%2$s'",
-                packageFileName, getSerialNumber()));
-
-            sync = getSyncService();
+            log.debug(String.format("Uploading %1$s onto device '%2$s'", packageFileName, getSerialNumber()));
             if (sync != null) {
-                String message = String.format("Uploading file onto device '%1$s'",
-                    getSerialNumber());
-                Log.d(LOG_TAG, message);
                 sync.pushFile(localFileStream, remoteFilePath, SyncService.getNullProgressMonitor());
             } else {
                 throw new IOException("Unable to open sync connection!");
             }
             return remoteFilePath;
-        } catch (TimeoutException e) {
-            Log.e(LOG_TAG, "Error during Sync: timeout.");
-            throw e;
-
-        } catch (SyncException | IOException e) {
-            Log.e(LOG_TAG, String.format("Error during Sync: %1$s", e.getMessage()));
-            throw e;
-        } finally {
-            if (sync != null) {
-                sync.close();
-            }
         }
     }
 

@@ -33,7 +33,8 @@ public class AdbConnector extends ChannelDuplexHandler {
             .channel(NioSocketChannel.class)
             .handler(this)
             .option(NioChannelOption.CONNECT_TIMEOUT_MILLIS, config.getConnectTimeoutMills())
-            .option(NioChannelOption.TCP_NODELAY, Boolean.TRUE);
+            .option(NioChannelOption.TCP_NODELAY, Boolean.TRUE)
+            .option(NioChannelOption.SO_KEEPALIVE, Boolean.TRUE);
     }
 
     public AdbConnection connect(InetSocketAddress adbSockAddr, String serialnumber) throws IOException {

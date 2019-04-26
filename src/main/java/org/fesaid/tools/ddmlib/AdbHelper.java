@@ -68,6 +68,10 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
         public String message;
     }
 
+    static AdbConnection connect(InetSocketAddress address, IDevice device) throws IOException {
+        return adbConnector.connect(address, device.getSerialNumber());
+    }
+
     /**
      * Creates and connects a new pass-through socket, from the host to a port on the device.
      *

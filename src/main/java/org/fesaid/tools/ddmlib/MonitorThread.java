@@ -23,22 +23,28 @@ import java.util.Set;
 /**
  * Monitor open connections.
  */
+@SuppressWarnings({"unused", "WeakerAccess"})
 final class MonitorThread extends Thread {
 
     private final DdmJdwpExtension mDdmJdwpExtension;
 
     private volatile boolean mQuit = false;
 
-    // List of clients we're paying attention to
-    // Used for locking so final.
+    /**
+     * List of clients we're paying attention to Used for locking so final.
+     */
     final private ArrayList<Client> mClientList;
 
-    // The almighty mux
+    /**
+     * The almighty mux
+     */
     private Selector mSelector;
 
     private final List<JdwpExtension> mJdwpExtensions;
 
-    // port for "debug selected"
+    /**
+     * port for "debug selected"
+     */
     private ServerSocketChannel mDebugSelectedChan;
 
     private int mNewDebugSelectedPort;
@@ -50,7 +56,9 @@ final class MonitorThread extends Thread {
      */
     private Client mSelectedClient = null;
 
-    // singleton
+    /**
+     * singleton
+     */
     private static MonitorThread sInstance;
 
     /**
@@ -58,12 +66,10 @@ final class MonitorThread extends Thread {
      */
     private MonitorThread() {
         super("Monitor");
-        mClientList = new ArrayList<Client>();
-
+        mClientList = new ArrayList<>();
         mNewDebugSelectedPort = DdmPreferences.getSelectedDebugPort();
-
         mDdmJdwpExtension = new DdmJdwpExtension();
-        mJdwpExtensions = new LinkedList<JdwpExtension>();
+        mJdwpExtensions = new LinkedList<>();
         mJdwpExtensions.add(mDdmJdwpExtension);
     }
 
@@ -142,11 +148,12 @@ final class MonitorThread extends Thread {
      * leave them alone.
      */
     boolean getRetryOnBadHandshake() {
-        return true; // TODO? make configurable
+        // TODO? make configurable
+        return true;
     }
 
     /**
-     * Get an array of known clients.
+     *Get an array of known clients.
      */
     Client[] getClients() {
         synchronized (mClientList) {
@@ -170,18 +177,15 @@ final class MonitorThread extends Thread {
     @Override
     public void run() {
         Log.d("ddms", "Monitor is up");
-
         // create a selector
         try {
             mSelector = Selector.open();
         } catch (IOException ioe) {
             Log.logAndDisplay(LogLevel.ERROR, "ddms",
-                    "Failed to initialize Monitor Thread: " + ioe.getMessage());
+                "Failed to initialize Monitor Thread: " + ioe.getMessage());
             return;
         }
-
         while (!mQuit) {
-
             try {
                 /*
                  * sync with new registrations: we wait until addClient is done before going through
@@ -190,14 +194,11 @@ final class MonitorThread extends Thread {
                  */
                 synchronized (mClientList) {
                 }
-
                 // (re-)open the "debug selected" port, if it's not opened yet or
                 // if the port changed.
                 try {
                     if (AndroidDebugBridge.getClientSupport()) {
-                        if ((mDebugSelectedChan == null ||
-                                mNewDebugSelectedPort != mDebugSelectedPort) &&
-                                mNewDebugSelectedPort != -1) {
+                        if ((mDebugSelectedChan == null || mNewDebugSelectedPort != mDebugSelectedPort) && mNewDebugSelectedPort != -1) {
                             if (reopenDebugSelectedPort()) {
                                 mDebugSelectedPort = mNewDebugSelectedPort;
                             }
@@ -207,9 +208,9 @@ final class MonitorThread extends Thread {
                     Log.e("ddms",
                             "Failed to reopen debug port for Selected Client to: " + mNewDebugSelectedPort);
                     Log.e("ddms", ioe);
-                    mNewDebugSelectedPort = mDebugSelectedPort; // no retry
+                    // no retry
+                    mNewDebugSelectedPort = mDebugSelectedPort;
                 }
-
                 int count;
                 try {
                     count = mSelector.select();
@@ -219,20 +220,15 @@ final class MonitorThread extends Thread {
                 } catch (CancelledKeyException cke) {
                     continue;
                 }
-
                 if (count == 0) {
                     // somebody called wakeup() ?
-                    // Log.i("ddms", "selector looping");
                     continue;
                 }
-
                 Set<SelectionKey> keys = mSelector.selectedKeys();
                 Iterator<SelectionKey> iter = keys.iterator();
-
                 while (iter.hasNext()) {
                     SelectionKey key = iter.next();
                     iter.remove();
-
                     try {
                         if (key.attachment() instanceof Client) {
                             processClientActivity(key);
@@ -270,7 +266,7 @@ final class MonitorThread extends Thread {
         return mDebugSelectedPort;
     }
 
-    /*
+    /**
      * Something happened. Figure out what.
      */
     private void processClientActivity(SelectionKey key) {
@@ -279,7 +275,7 @@ final class MonitorThread extends Thread {
         try {
             if (!key.isReadable() || !key.isValid()) {
                 Log.d("ddms", "Invalid key from " + client + ". Dropping client.");
-                dropClient(client, true /* notify */);
+                dropClient(client, true);
                 return;
             }
 
@@ -298,18 +294,16 @@ final class MonitorThread extends Thread {
                 // find next
                 packet = client.getJdwpPacket();
             }
-        } catch (CancelledKeyException e) {
+        } catch (CancelledKeyException | IOException e) {
             // key was canceled probably due to a disconnected client before we could
             // read stuff coming from the client, so we drop it.
-            dropClient(client, true /* notify */);
-        } catch (IOException ex) {
-            // something closed down, no need to print anything. The client is simply dropped.
-            dropClient(client, true /* notify */);
-        } catch (Exception ex) {
+            dropClient(client, true);
+        } // something closed down, no need to print anything. The client is simply dropped.
+        catch (Exception ex) {
             Log.e("ddms", ex);
 
             /* close the client; automatically un-registers from selector */
-            dropClient(client, true /* notify */);
+            dropClient(client, true);
 
             if (ex instanceof BufferOverflowException) {
                 Log.w("ddms",
@@ -325,8 +319,8 @@ final class MonitorThread extends Thread {
     /**
      * Drops a client from the monitor.
      * <p>This will lock the {@link Client} list of the {@link Device} running <var>client</var>.
-     * @param client
-     * @param notify
+     * @param client client
+     * @param notify notify
      */
     synchronized void dropClient(Client client, boolean notify) {
         if (sInstance == null) {
@@ -352,13 +346,14 @@ final class MonitorThread extends Thread {
      * Drops the provided list of clients from the monitor. This will lock the {@link Client}
      * list of the {@link Device} running each of the clients.
      */
+    @SuppressWarnings("SameParameterValue")
     synchronized void dropClients(Collection<? extends Client> clients, boolean notify) {
         for (Client c : clients) {
             dropClient(c, notify);
         }
     }
 
-    /*
+    /**
      * Process activity from one of the debugger sockets. This could be a new
      * connection or a data packet.
      */
@@ -383,7 +378,7 @@ final class MonitorThread extends Thread {
         }
     }
 
-    /*
+    /**
      * Accept a new connection from a debugger. If successful, register it with
      * the Selector.
      */
@@ -393,26 +388,20 @@ final class MonitorThread extends Thread {
         synchronized (mClientList) {
             SocketChannel chan;
 
-            if (acceptChan == null)
+            if (acceptChan == null) {
                 chan = dbg.accept();
-            else
+            } else {
                 chan = dbg.accept(acceptChan);
-
+            }
             if (chan != null) {
                 chan.socket().setTcpNoDelay(true);
-
                 wakeup();
-
                 try {
                     chan.register(mSelector, SelectionKey.OP_READ, dbg);
-                } catch (IOException ioe) {
+                } catch (IOException | RuntimeException ioe) {
                     // failed, drop the connection
                     dbg.closeData();
                     throw ioe;
-                } catch (RuntimeException re) {
-                    // failed, drop the connection
-                    dbg.closeData();
-                    throw re;
                 }
             } else {
                 Log.w("ddms", "ignoring duplicate debugger");
@@ -421,7 +410,7 @@ final class MonitorThread extends Thread {
         }
     }
 
-    /*
+    /**
      * We have incoming data from the debugger. Forward it to the client.
      */
     private void processDebuggerData(SelectionKey key) {
@@ -430,7 +419,7 @@ final class MonitorThread extends Thread {
         dbg.processChannelData();
     }
 
-    /*
+    /**
      * Tell the thread that something has changed.
      */
     private void wakeup() {
@@ -450,7 +439,7 @@ final class MonitorThread extends Thread {
             // the DebugSelectedPort
             synchronized (mClientList) {
                 for (Client c : mClientList) {
-                    c.close(false /* notify */);
+                    c.close(false);
                     mDdmJdwpExtension.broadcast(DdmJdwpExtension.Event.CLIENT_DISCONNECTED, c);
                 }
                 mClientList.clear();
@@ -462,13 +451,10 @@ final class MonitorThread extends Thread {
                 mDebugSelectedChan = null;
             }
             mSelector.close();
-        } catch (InterruptedException ie) {
+        } catch (InterruptedException | IOException ie) {
             ie.printStackTrace();
-        } catch (IOException e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
         }
-
         sInstance = null;
     }
 
@@ -519,7 +505,7 @@ final class MonitorThread extends Thread {
     /**
      * Opens (or reopens) the "debug selected" port and listen for connections.
      * @return true if the port was opened successfully.
-     * @throws IOException
+     * @throws IOException io
      */
     private boolean reopenDebugSelectedPort() throws IOException {
 
@@ -529,12 +515,14 @@ final class MonitorThread extends Thread {
         }
 
         mDebugSelectedChan = ServerSocketChannel.open();
-        mDebugSelectedChan.configureBlocking(false); // required for Selector
+        // required for Selector
+        mDebugSelectedChan.configureBlocking(false);
 
         InetSocketAddress addr = new InetSocketAddress(
-                InetAddress.getByName("localhost"), //$NON-NLS-1$
+                InetAddress.getByName("localhost"),
                 mNewDebugSelectedPort);
-        mDebugSelectedChan.socket().setReuseAddress(true); // enable SO_REUSEADDR
+        // enable SO_REUSEADDR
+        mDebugSelectedChan.socket().setReuseAddress(true);
 
         try {
             mDebugSelectedChan.socket().bind(addr);
@@ -556,7 +544,7 @@ final class MonitorThread extends Thread {
         }
     }
 
-    /*
+    /**
      * We have some activity on the "debug selected" port. Handle it.
      */
     private void processDebugSelectedActivity(SelectionKey key) {
@@ -595,10 +583,9 @@ final class MonitorThread extends Thread {
     }
 
     private void displayDebugSelectedBindError(int port) {
-        String message = String.format(
-                "Could not open Selected VM debug port (%1$d). Make sure you do not have another instance of DDMS or of the eclipse plugin running. If it's being used by something else, choose a new port number in the preferences.",
-                port);
-
+        String message = String.format("Could not open Selected VM debug port (%1$d). Make sure you do not have " +
+            "another instance of DDMS or of the eclipse plugin running. If it's being used by something else, choose" +
+            " a new port number in the preferences.", port);
         Log.logAndDisplay(LogLevel.ERROR, "ddms", message);
     }
 
