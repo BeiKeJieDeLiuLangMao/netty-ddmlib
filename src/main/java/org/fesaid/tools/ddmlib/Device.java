@@ -28,13 +28,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.fesaid.tools.ddmlib.log.LogReceiver;
+import org.fesaid.tools.ddmlib.netty.AdbConnection;
 
 import static com.android.sdklib.AndroidVersion.VersionCodes.KITKAT;
 
 /**
  * A Device. It can be a physical device or an emulator.
  */
-@Slf4j final class Device implements IDevice {
+@Slf4j
+final class Device implements IDevice {
     /** Emulator Serial Number regexp. */
     static final String RE_EMULATOR_SN = "emulator-(\\d+)";
     private static final String ZERO = "0";
@@ -91,7 +93,7 @@ import static com.android.sdklib.AndroidVersion.VersionCodes.KITKAT;
     /**
      * Socket for the connection monitoring client connection/disconnection.
      */
-    private SocketChannel mSocketChannel;
+    private AdbConnection mSocketChannel;
 
     /** Path to the screen recorder binary on the device. */
     private static final String SCREEN_RECORDER_DEVICE_PATH = "/system/bin/screenrecord";
@@ -675,17 +677,17 @@ import static com.android.sdklib.AndroidVersion.VersionCodes.KITKAT;
     }
 
     /** Sets the socket channel on which a track-jdwp command for this device has been sent. */
-    void setClientMonitoringSocket(@NonNull SocketChannel socketChannel) {
+    void setClientMonitoringSocket(@NonNull AdbConnection socketChannel) {
         mSocketChannel = socketChannel;
     }
 
     /**
      * Returns the channel on which responses to the track-jdwp command will be available if it has been set, null
-     * otherwise. The channel is set via {@link #setClientMonitoringSocket(SocketChannel)}, which is usually invoked
+     * otherwise. The channel is set via {@link #setClientMonitoringSocket(AdbConnection)}, which is usually invoked
      * when the device goes online.
      */
     @Nullable
-    SocketChannel getClientMonitoringSocket() {
+    AdbConnection getClientMonitoringSocket() {
         return mSocketChannel;
     }
 

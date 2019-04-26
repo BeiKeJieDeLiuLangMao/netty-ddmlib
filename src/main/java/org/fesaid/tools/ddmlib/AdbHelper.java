@@ -27,7 +27,7 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
  * but seems like overkill for what we're doing here.
  */
 @SuppressWarnings({"WeakerAccess"})
-@Slf4j final class AdbHelper {
+@Slf4j public final class AdbHelper {
 
     // public static final long kOkay = 0x59414b4fL;
     // public static final long kFail = 0x4c494146L;
@@ -37,7 +37,7 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
      */
     private static final int WAIT_TIME = 5;
 
-    static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+    public static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
     static AdbConnector adbConnector;
 
     /** do not instantiate */
@@ -68,8 +68,8 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
         public String message;
     }
 
-    static AdbConnection connect(InetSocketAddress address, IDevice device) throws IOException {
-        return adbConnector.connect(address, device.getSerialNumber());
+    static AdbConnection connect(InetSocketAddress address, String serialNumber) throws IOException {
+        return adbConnector.connect(address, serialNumber);
     }
 
     /**

@@ -34,7 +34,6 @@ public class IDeviceTest implements TrafficHandlerGetter, AndroidDebugBridge.IDe
         EXECUTOR = new ScheduledThreadPoolExecutor(THREAD_SIZE, new DefaultThreadFactory(THREAD_NAME_PREFIX, THREAD_SIZE));
         GLOBAL_TRAFFIC_HANDLER = new GlobalTrafficShapingHandler(EXECUTOR,
             100 * 1024 * 1024, 100 * 1024 * 1024);
-        EXECUTOR.scheduleAtFixedRate(new TrafficCounterTracker(), 1, 1, TimeUnit.SECONDS);
     }
 
     @Before
@@ -42,7 +41,7 @@ public class IDeviceTest implements TrafficHandlerGetter, AndroidDebugBridge.IDe
         AdbNettyConfig adbNettyConfig = new AdbNettyConfig();
         adbNettyConfig.setTrafficHandlerGetter(this);
         AndroidDebugBridge.addDeviceChangeListener(this);
-        AndroidDebugBridge.initIfNeeded(true, adbNettyConfig);
+        AndroidDebugBridge.initIfNeeded(false, adbNettyConfig);
         AndroidDebugBridge.createBridge();
         while (true) {
             if (device == null) {
@@ -71,16 +70,19 @@ public class IDeviceTest implements TrafficHandlerGetter, AndroidDebugBridge.IDe
 
     @Override
     public void deviceConnected(IDevice device) {
+        log.info("deviceConnected, {}", device);
         this.device = device;
     }
 
     @Override
     public void deviceDisconnected(IDevice device) {
+        log.info("deviceDisconnected, {}", device);
         this.device = device;
     }
 
     @Override
     public void deviceChanged(IDevice device, int changeMask) {
+        log.info("deviceChanged, {}", device);
         this.device = device;
     }
 
@@ -94,6 +96,17 @@ public class IDeviceTest implements TrafficHandlerGetter, AndroidDebugBridge.IDe
             log.info("Global: read: {}, write: {}", GLOBAL_TRAFFIC_HANDLER.trafficCounter().lastReadThroughput(),
                 GLOBAL_TRAFFIC_HANDLER.trafficCounter().lastWriteThroughput());
         }
+    }
+
+    @Test
+    public void testTrafficLimit() throws InterruptedException {
+        EXECUTOR.scheduleAtFixedRate(new TrafficCounterTracker(), 1, 1, TimeUnit.SECONDS);
+        Thread.sleep(100000);
+    }
+
+    @Test
+    public void testMonitor() throws InterruptedException {
+        Thread.sleep(100000);
     }
 
     @Test

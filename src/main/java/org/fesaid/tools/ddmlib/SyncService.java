@@ -198,7 +198,7 @@ public class SyncService implements Closeable {
      */
     boolean openSync() throws TimeoutException, AdbCommandRejectedException, IOException {
         try {
-            mChannel = connect(mAddress, mDevice);
+            mChannel = connect(mAddress, mDevice.getSerialNumber());
             setDevice(mChannel, mDevice);
             mChannel.sendAndWaitSuccess("sync:", getTimeOut(), MILLISECONDS);
             return true;

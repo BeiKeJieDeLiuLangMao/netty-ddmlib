@@ -33,14 +33,10 @@ public class AdbConnection implements Closeable {
         if (nextHandlers != null && nextHandlers.length > 0) {
             channel.pipeline().addLast(nextHandlers);
         }
-        try {
-            send(message, timeout, timeUnit);
-            adbRespondHandler.waitRespond(timeout, timeUnit);
-            if (!adbRespondHandler.getOkay()) {
-                throw new AdbCommandRejectedException(adbRespondHandler.getMessage());
-            }
-        } finally {
-            channel.pipeline().remove(adbRespondHandler);
+        send(message, timeout, timeUnit);
+        adbRespondHandler.waitRespond(timeout, timeUnit);
+        if (!adbRespondHandler.getOkay()) {
+            throw new AdbCommandRejectedException(adbRespondHandler.getMessage());
         }
     }
 

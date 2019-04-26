@@ -56,15 +56,17 @@ public class AdbConnector extends ChannelDuplexHandler {
     }
 
     private void injectTrafficHandler(Channel channel, String serialNumber) {
-        GlobalTrafficShapingHandler deviceTrafficHandler =
-            config.getTrafficHandlerGetter().getDeviceTrafficHandler(serialNumber);
-        if (!Objects.isNull(deviceTrafficHandler)) {
-            channel.pipeline().addLast(deviceTrafficHandler);
-        }
         GlobalTrafficShapingHandler globalTrafficHandler =
             config.getTrafficHandlerGetter().getGlobalTrafficHandler();
         if (!Objects.isNull(globalTrafficHandler)) {
             channel.pipeline().addLast(globalTrafficHandler);
+        }
+        if (!Objects.isNull(serialNumber)) {
+            GlobalTrafficShapingHandler deviceTrafficHandler =
+                config.getTrafficHandlerGetter().getDeviceTrafficHandler(serialNumber);
+            if (!Objects.isNull(deviceTrafficHandler)) {
+                channel.pipeline().addLast(deviceTrafficHandler);
+            }
         }
     }
 }
