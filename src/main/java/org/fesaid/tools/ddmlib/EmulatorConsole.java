@@ -23,96 +23,91 @@ import java.util.regex.Pattern;
 /**
  * Provides control over emulated hardware of the Android emulator.
  * <p>This is basically a wrapper around the command line console normally used with telnet.
- *<p>
- * Regarding line termination handling:<br>
- * One of the issues is that the telnet protocol <b>requires</b> usage of <code>\r\n</code>. Most
- * implementations don't enforce it (the dos one does). In this particular case, this is mostly
- * irrelevant since we don't use telnet in Java, but that means we want to make
- * sure we use the same line termination than what the console expects. The console
- * code removes <code>\r</code> and waits for <code>\n</code>.
+ * <p>
+ * Regarding line termination handling:<br> One of the issues is that the telnet protocol <b>requires</b> usage of
+ * <code>\r\n</code>. Most implementations don't enforce it (the dos one does). In this particular case, this is mostly
+ * irrelevant since we don't use telnet in Java, but that means we want to make sure we use the same line termination
+ * than what the console expects. The console code removes <code>\r</code> and waits for <code>\n</code>.
  * <p>However this means you <i>may</i> receive <code>\r\n</code> when reading from the console.
  * <p>
  * <b>This API will change in the near future.</b>
+ *
+ * @author AOSP
  */
+@SuppressWarnings({"WeakerAccess", "unused"})
 public final class EmulatorConsole {
 
-    private static final String DEFAULT_ENCODING = "ISO-8859-1"; //$NON-NLS-1$
+    private static final String DEFAULT_ENCODING = "ISO-8859-1";
 
-    private static final int WAIT_TIME = 5; // spin-wait sleep, in ms
+    /**
+     * spin-wait sleep, in ms
+     */
+    private static final int WAIT_TIME = 5;
 
-    private static final int STD_TIMEOUT = 5000; // standard delay, in ms
+    /**
+     * standard delay, in ms
+     */
+    private static final int STD_TIMEOUT = 5000;
 
-    private static final String HOST = "127.0.0.1";  //$NON-NLS-1$
+    private static final String HOST = "127.0.0.1";
 
-    private static final String COMMAND_PING = "help\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_AVD_NAME = "avd name\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_KILL = "kill\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_GSM_STATUS = "gsm status\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_GSM_CALL = "gsm call %1$s\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_GSM_CANCEL_CALL = "gsm cancel %1$s\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_GSM_DATA = "gsm data %1$s\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_GSM_VOICE = "gsm voice %1$s\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_SMS_SEND = "sms send %1$s %2$s\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_NETWORK_STATUS = "network status\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_NETWORK_SPEED = "network speed %1$s\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_NETWORK_LATENCY = "network delay %1$s\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_GPS = "geo fix %1$f %2$f %3$f\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_AUTH = "auth %1$s\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_SCREENRECORD_START =
-            "screenrecord start %1$s\r\n"; //$NON-NLS-1$
-    private static final String COMMAND_SCREENRECORD_STOP = "screenrecord stop\r\n"; //$NON-NLS-1$
+    private static final String COMMAND_PING = "help\r\n";
+    private static final String COMMAND_AVD_NAME = "avd name\r\n";
+    private static final String COMMAND_KILL = "kill\r\n";
+    private static final String COMMAND_GSM_STATUS = "gsm status\r\n";
+    private static final String COMMAND_GSM_CALL = "gsm call %1$s\r\n";
+    private static final String COMMAND_GSM_CANCEL_CALL = "gsm cancel %1$s\r\n";
+    private static final String COMMAND_GSM_DATA = "gsm data %1$s\r\n";
+    private static final String COMMAND_GSM_VOICE = "gsm voice %1$s\r\n";
+    private static final String COMMAND_SMS_SEND = "sms send %1$s %2$s\r\n";
+    private static final String COMMAND_NETWORK_STATUS = "network status\r\n";
+    private static final String COMMAND_NETWORK_SPEED = "network speed %1$s\r\n";
+    private static final String COMMAND_NETWORK_LATENCY = "network delay %1$s\r\n";
+    private static final String COMMAND_GPS = "geo fix %1$f %2$f %3$f\r\n";
+    private static final String COMMAND_AUTH = "auth %1$s\r\n";
+    private static final String COMMAND_SCREENRECORD_START = "screenrecord start %1$s\r\n";
+    private static final String COMMAND_SCREENRECORD_STOP = "screenrecord stop\r\n";
 
-    private static final Pattern RE_KO = Pattern.compile("KO:\\s+(.*)"); //$NON-NLS-1$
-    private static final String RE_AUTH_REQUIRED = "Android Console: Authentication required"; //$NON-NLS-1$
+    private static final Pattern RE_KO = Pattern.compile("KO:\\s+(.*)");
+    private static final String RE_AUTH_REQUIRED = "Android Console: Authentication required";
 
     private static final String EMULATOR_CONSOLE_AUTH_TOKEN = ".emulator_console_auth_token";
     /**
-     * Array of delay values: no delay, gprs, edge/egprs, umts/3d
+     * Array of delay values: no delay gprs edge/egprs umts/3d
      */
-    public static final int[] MIN_LATENCIES = new int[] {
-        0,      // No delay
-        150,    // gprs
-        80,     // edge/egprs
-        35      // umts/3g
-    };
+    public static final int[] MIN_LATENCIES = new int[] {0, 150, 80, 35};
 
     /**
-     * Array of download speeds: full speed, gsm, hscsd, gprs, edge/egprs, umts/3g, hsdpa.
+     * Array of download speeds: full speed gsm hscsd gprs edge/egprs umts/3g hsdpa.
      */
-    public static final int[] DOWNLOAD_SPEEDS = new int[] {
-        0,          // full speed
-        14400,      // gsm
-        43200,      // hscsd
-        80000,      // gprs
-        236800,     // edge/egprs
-        1920000,    // umts/3g
-        14400000    // hsdpa
-    };
+    public static final int[] DOWNLOAD_SPEEDS = new int[] {0, 14400, 43200, 80000, 236800, 1920000, 14400000};
 
     /** Arrays of valid network speeds */
     public static final String[] NETWORK_SPEEDS = new String[] {
-        "full", //$NON-NLS-1$
-        "gsm", //$NON-NLS-1$
-        "hscsd", //$NON-NLS-1$
-        "gprs", //$NON-NLS-1$
-        "edge", //$NON-NLS-1$
-        "umts", //$NON-NLS-1$
-        "hsdpa", //$NON-NLS-1$
+        "full",
+        "gsm",
+        "hscsd",
+        "gprs",
+        "edge",
+        "umts",
+        "hsdpa",
     };
 
     /** Arrays of valid network latencies */
     public static final String[] NETWORK_LATENCIES = new String[] {
-        "none", //$NON-NLS-1$
-        "gprs", //$NON-NLS-1$
-        "edge", //$NON-NLS-1$
-        "umts", //$NON-NLS-1$
+        "none",
+        "gprs",
+        "edge",
+        "umts",
     };
 
-    /** Gsm Mode enum. */
     public enum GsmMode {
-        UNKNOWN((String)null),
-        UNREGISTERED(new String[] { "unregistered", "off" }),
-        HOME(new String[] { "home", "on" }),
+        /**
+         * Gsm Mode enum.
+         */
+        UNKNOWN((String) null),
+        UNREGISTERED(new String[] {"unregistered", "off"}),
+        HOME(new String[] {"home", "on"}),
         ROAMING("roaming"),
         SEARCHING("searching"),
         DENIED("denied");
@@ -121,7 +116,7 @@ public final class EmulatorConsole {
 
         GsmMode(String tag) {
             if (tag != null) {
-                this.tags = new String[] { tag };
+                this.tags = new String[] {tag};
             } else {
                 this.tags = new String[0];
             }
@@ -155,19 +150,18 @@ public final class EmulatorConsole {
 
     public static final String RESULT_OK = null;
 
-    private static final Pattern sEmulatorRegexp = Pattern.compile(Device.RE_EMULATOR_SN);
-    private static final Pattern sVoiceStatusRegexp = Pattern.compile(
-            "gsm\\s+voice\\s+state:\\s*([a-z]+)", Pattern.CASE_INSENSITIVE); //$NON-NLS-1$
-    private static final Pattern sDataStatusRegexp = Pattern.compile(
-            "gsm\\s+data\\s+state:\\s*([a-z]+)", Pattern.CASE_INSENSITIVE); //$NON-NLS-1$
-    private static final Pattern sDownloadSpeedRegexp = Pattern.compile(
-            "\\s+download\\s+speed:\\s+(\\d+)\\s+bits.*", Pattern.CASE_INSENSITIVE); //$NON-NLS-1$
-    private static final Pattern sMinLatencyRegexp = Pattern.compile(
-            "\\s+minimum\\s+latency:\\s+(\\d+)\\s+ms", Pattern.CASE_INSENSITIVE); //$NON-NLS-1$
+    private static final Pattern S_EMULATOR_REGEXP = Pattern.compile(Device.RE_EMULATOR_SN);
+    private static final Pattern S_VOICE_STATUS_REGEXP =
+        Pattern.compile("gsm\\s+voice\\s+state:\\s*([a-z]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern S_DATA_STATUS_REGEXP =
+        Pattern.compile("gsm\\s+data\\s+state:\\s*([a-z]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern S_DOWNLOAD_SPEED_REGEXP =
+        Pattern.compile("\\s+download\\s+speed:\\s+(\\d+)\\s+bits.*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern S_MIN_LATENCY_REGEXP =
+        Pattern.compile("\\s+minimum\\s+latency:\\s+(\\d+)\\s+ms", Pattern.CASE_INSENSITIVE);
 
-    @GuardedBy(value = "sEmulators")
-    private static final HashMap<Integer, EmulatorConsole> sEmulators =
-        new HashMap<Integer, EmulatorConsole>();
+    @GuardedBy(value = "S_EMULATORS")
+    private static final HashMap<Integer, EmulatorConsole> S_EMULATORS = new HashMap<>();
 
     private static final String LOG_TAG = "EmulatorConsole";
 
@@ -187,18 +181,18 @@ public final class EmulatorConsole {
         public int latency = -1;
     }
 
-    private int mPort = -1;
+    private int mPort;
 
     private SocketChannel mSocketChannel;
 
     private byte[] mBuffer = new byte[1024];
 
     /**
-     * Returns an {@link EmulatorConsole} object for the given {@link Device}. This can
-     * be an already existing console, or a new one if it hadn't been created yet.
-     * Note: emulator consoles don't automatically close when an emulator exists. It is the
-     * responsibility of higher level code to explicitly call {@link #close()} when the emulator
+     * Returns an {@link EmulatorConsole} object for the given {@link Device}. This can be an already existing console,
+     * or a new one if it hadn't been created yet. Note: emulator consoles don't automatically close when an emulator
+     * exists. It is the responsibility of higher level code to explicitly call {@link #close()} when the emulator
      * corresponding to a open console is killed.
+     *
      * @param d The device that the console links to.
      * @return an <code>EmulatorConsole</code> object or <code>null</code> if the connection failed.
      */
@@ -229,7 +223,7 @@ public final class EmulatorConsole {
      * @return the integer port or <code>null</code> if it could not be determined
      */
     public static Integer getEmulatorPort(String serialNumber) {
-        Matcher m = sEmulatorRegexp.matcher(serialNumber);
+        Matcher m = S_EMULATOR_REGEXP.matcher(serialNumber);
         if (m.matches()) {
             // get the port number. This is the console port.
             int port;
@@ -252,12 +246,12 @@ public final class EmulatorConsole {
      */
     @NonNull
     private static EmulatorConsole retrieveConsole(int port) {
-        synchronized (sEmulators) {
-            EmulatorConsole console = sEmulators.get(port);
+        synchronized (S_EMULATORS) {
+            EmulatorConsole console = S_EMULATORS.get(port);
             if (console == null) {
-                Log.v(LOG_TAG, "Creating emulator console for " + Integer.toString(port));
+                Log.v(LOG_TAG, "Creating emulator console for " + port);
                 console = new EmulatorConsole(port);
-                sEmulators.put(port, console);
+                S_EMULATORS.put(port, console);
             }
             return console;
         }
@@ -265,15 +259,16 @@ public final class EmulatorConsole {
 
     /**
      * Removes the console object associated with a port from the map.
+     *
      * @param port The port of the console to remove.
      */
     private static void removeConsole(int port) {
-        synchronized (sEmulators) {
-            Log.v(LOG_TAG, "Removing emulator console for " + Integer.toString(port));
-            EmulatorConsole console = sEmulators.get(port);
+        synchronized (S_EMULATORS) {
+            Log.v(LOG_TAG, "Removing emulator console for " + port);
+            EmulatorConsole console = S_EMULATORS.get(port);
             if (console != null) {
                 console.closeConnection();
-                sEmulators.remove(port);
+                S_EMULATORS.remove(port);
             }
         }
     }
@@ -283,8 +278,8 @@ public final class EmulatorConsole {
     }
 
     /**
-     * Determine if connection to emulator console is functioning. Starts the connection if
-     * necessary
+     * Determine if connection to emulator console is functioning. Starts the connection if necessary
+     *
      * @return true if success.
      */
     private synchronized boolean checkConnection() {
@@ -322,6 +317,7 @@ public final class EmulatorConsole {
 
     /**
      * Ping the emulator to check if the connection is still alive.
+     *
      * @return true if the connection is alive.
      */
     private synchronized boolean ping() {
@@ -374,17 +370,18 @@ public final class EmulatorConsole {
             String[] result = readLines();
             // qemu2's readline implementation sends some formatting characters in the first line
             // let's make sure that only the last two lines are fine
-            if (result != null && result.length >= 2) { // this should be the name on the (length - 1)th line,
-                                                        // and ok on last one
+            // this should be the name on the (length - 1)th line,
+            if (result != null && result.length >= 2) {
+                // and ok on last one
                 return result[result.length - 2];
             } else {
                 // try to see if there's a message after KO
-                Matcher m = RE_KO.matcher(result[result.length-1]);
+                Matcher m = RE_KO.matcher(result[result.length - 1]);
                 if (m.matches()) {
                     return m.group(1);
                 }
                 Log.w(LOG_TAG, "avd name result did not match expected");
-                for (int i=0; i < result.length; i++) {
+                for (int i = 0; i < result.length; i++) {
                     Log.d(LOG_TAG, result[i]);
                 }
             }
@@ -395,6 +392,7 @@ public final class EmulatorConsole {
 
     /**
      * Get the network status of the emulator.
+     *
      * @return a {@link NetworkStatus} object containing the {@link GsmStatus}, or
      * <code>null</code> if the query failed.
      */
@@ -415,7 +413,7 @@ public final class EmulatorConsole {
                 // the line testing the regexp.
                 NetworkStatus status = new NetworkStatus();
                 for (String line : result) {
-                    Matcher m = sDownloadSpeedRegexp.matcher(line);
+                    Matcher m = S_DOWNLOAD_SPEED_REGEXP.matcher(line);
                     if (m.matches()) {
                         // get the string value
                         String value = m.group(1);
@@ -426,8 +424,7 @@ public final class EmulatorConsole {
                         // move on to next line.
                         continue;
                     }
-
-                    m = sMinLatencyRegexp.matcher(line);
+                    m = S_MIN_LATENCY_REGEXP.matcher(line);
                     if (m.matches()) {
                         // get the string value
                         String value = m.group(1);
@@ -436,7 +433,6 @@ public final class EmulatorConsole {
                         status.latency = getLatencyIndex(value);
 
                         // move on to next line.
-                        continue;
                     }
                 }
 
@@ -449,8 +445,8 @@ public final class EmulatorConsole {
 
     /**
      * Returns the current gsm status of the emulator
-     * @return a {@link GsmStatus} object containing the gms status, or <code>null</code>
-     * if the query failed.
+     *
+     * @return a {@link GsmStatus} object containing the gms status, or <code>null</code> if the query failed.
      */
     public synchronized GsmStatus getGsmStatus() {
         if (sendCommand(COMMAND_GSM_STATUS)) {
@@ -469,28 +465,21 @@ public final class EmulatorConsole {
                 // let's not rely on the order of the output, and simply loop through
                 // the line testing the regexp.
                 for (String line : result) {
-                    Matcher m = sVoiceStatusRegexp.matcher(line);
+                    Matcher m = S_VOICE_STATUS_REGEXP.matcher(line);
                     if (m.matches()) {
                         // get the string value
                         String value = m.group(1);
-
                         // get the index from the list
                         status.voice = GsmMode.getEnum(value.toLowerCase(Locale.US));
-
                         // move on to next line.
                         continue;
                     }
-
-                    m = sDataStatusRegexp.matcher(line);
+                    m = S_DATA_STATUS_REGEXP.matcher(line);
                     if (m.matches()) {
                         // get the string value
                         String value = m.group(1);
-
                         // get the index from the list
                         status.data = GsmMode.getEnum(value.toLowerCase(Locale.US));
-
-                        // move on to next line.
-                        continue;
                     }
                 }
 
@@ -503,6 +492,7 @@ public final class EmulatorConsole {
 
     /**
      * Sets the GSM voice mode.
+     *
      * @param mode the {@link GsmMode} value.
      * @return RESULT_OK if success, an error String otherwise.
      * @throws InvalidParameterException if mode is an invalid value.
@@ -518,6 +508,7 @@ public final class EmulatorConsole {
 
     /**
      * Sets the GSM data mode.
+     *
      * @param mode the {@link GsmMode} value
      * @return {@link #RESULT_OK} if success, an error String otherwise.
      * @throws InvalidParameterException if mode is an invalid value.
@@ -526,13 +517,13 @@ public final class EmulatorConsole {
         if (mode == GsmMode.UNKNOWN) {
             throw new InvalidParameterException();
         }
-
         String command = String.format(COMMAND_GSM_DATA, mode.getTag());
         return processCommand(command);
     }
 
     /**
      * Initiate an incoming call on the emulator.
+     *
      * @param number a string representing the calling number.
      * @return {@link #RESULT_OK} if success, an error String otherwise.
      */
@@ -543,6 +534,7 @@ public final class EmulatorConsole {
 
     /**
      * Cancels a current call.
+     *
      * @param number the number of the call to cancel
      * @return {@link #RESULT_OK} if success, an error String otherwise.
      */
@@ -553,10 +545,10 @@ public final class EmulatorConsole {
 
     /**
      * Sends an SMS to the emulator
-     * @param number The sender phone number
-     * @param message The SMS message. \ characters must be escaped. The carriage return is
-     * the 2 character sequence  {'\', 'n' }
      *
+     * @param number The sender phone number
+     * @param message The SMS message. \ characters must be escaped. The carriage return is the 2 character sequence
+     * {'\', 'n' }
      * @return {@link #RESULT_OK} if success, an error String otherwise.
      */
     public synchronized String sendSms(String number, String message) {
@@ -566,6 +558,7 @@ public final class EmulatorConsole {
 
     /**
      * Sets the network speed.
+     *
      * @param selectionIndex The index in the {@link #NETWORK_SPEEDS} table.
      * @return {@link #RESULT_OK} if success, an error String otherwise.
      */
@@ -576,6 +569,7 @@ public final class EmulatorConsole {
 
     /**
      * Sets the network latency.
+     *
      * @param selectionIndex The index in the {@link #NETWORK_LATENCIES} table.
      * @return {@link #RESULT_OK} if success, an error String otherwise.
      */
@@ -585,15 +579,10 @@ public final class EmulatorConsole {
     }
 
     public synchronized String sendLocation(double longitude, double latitude, double elevation) {
-
         // need to make sure the string format uses dot and not comma
-        Formatter formatter = new Formatter(Locale.US);
-        try {
+        try (Formatter formatter = new Formatter(Locale.US)) {
             formatter.format(COMMAND_GPS, longitude, latitude, elevation);
-
             return processCommand(formatter.toString());
-        } finally {
-            formatter.close();
         }
     }
 
@@ -616,6 +605,7 @@ public final class EmulatorConsole {
 
     /**
      * Sends a command to the emulator console.
+     *
      * @param command The command string. <b>MUST BE TERMINATED BY \n</b>.
      * @return true if success
      */
@@ -626,8 +616,7 @@ public final class EmulatorConsole {
             try {
                 bCommand = command.getBytes(DEFAULT_ENCODING);
             } catch (UnsupportedEncodingException e) {
-                Log.w(LOG_TAG, "wrong encoding when sending " + command + " to " +
-                        Integer.toString(mPort));
+                Log.w(LOG_TAG, "wrong encoding when sending " + command + " to " + mPort);
                 // wrong encoding...
                 return result;
             }
@@ -637,8 +626,7 @@ public final class EmulatorConsole {
 
             result = true;
         } catch (Exception e) {
-            Log.d(LOG_TAG, "Exception sending command " + command + " to " +
-                Integer.toString(mPort));
+            Log.d(LOG_TAG, "Exception sending command " + command + " to " + mPort);
             return false;
         } finally {
             if (!result) {
@@ -652,6 +640,7 @@ public final class EmulatorConsole {
 
     /**
      * Sends a command to the emulator and parses its answer.
+     *
      * @param command the command to send.
      * @return {@link #RESULT_OK} if success, an error message otherwise.
      */
@@ -660,7 +649,7 @@ public final class EmulatorConsole {
             String[] result = readLines();
 
             if (result != null && result.length > 0) {
-                Matcher m = RE_KO.matcher(result[result.length-1]);
+                Matcher m = RE_KO.matcher(result[result.length - 1]);
                 if (m.matches()) {
                     return m.group(1);
                 }
@@ -679,6 +668,7 @@ public final class EmulatorConsole {
      * <li>OK\r\n</li>
      * <li>KO<msg>\r\n</li>
      * </ul>
+     *
      * @return the array of strings read from the emulator.
      */
     private String[] readLines() {
@@ -700,7 +690,7 @@ public final class EmulatorConsole {
                     // non-blocking spin
                     try {
                         Thread.sleep(WAIT_TIME);
-                    } catch (InterruptedException ie) {
+                    } catch (InterruptedException ignored) {
                     }
                     numWaits++;
                 } else {
@@ -718,42 +708,44 @@ public final class EmulatorConsole {
             }
 
             String msg = new String(mBuffer, 0, buf.position(), DEFAULT_ENCODING);
-            return msg.split("\r\n"); //$NON-NLS-1$
+            return msg.split("\r\n");
         } catch (IOException e) {
-            Log.d(LOG_TAG, "Exception reading lines for " + Integer.toString(mPort));
+            Log.d(LOG_TAG, "Exception reading lines for " + mPort);
             return null;
         }
     }
 
     /**
      * Returns true if the 4 characters *before* the current position are "OK\r\n"
+     *
      * @param currentPosition The current position
      */
     private boolean endsWithOK(int currentPosition) {
         return mBuffer[currentPosition - 1] == '\n' &&
-                mBuffer[currentPosition - 2] == '\r' &&
-                mBuffer[currentPosition - 3] == 'K' &&
-                mBuffer[currentPosition - 4] == 'O';
+            mBuffer[currentPosition - 2] == '\r' &&
+            mBuffer[currentPosition - 3] == 'K' &&
+            mBuffer[currentPosition - 4] == 'O';
 
     }
 
     /**
      * Returns true if the last line starts with KO and is also terminated by \r\n
+     *
      * @param currentPosition the current position
      */
     private boolean lastLineIsKO(int currentPosition) {
         // first check that the last 2 characters are CRLF
-        if (mBuffer[currentPosition-1] != '\n' ||
-                mBuffer[currentPosition-2] != '\r') {
+        if (mBuffer[currentPosition - 1] != '\n' ||
+            mBuffer[currentPosition - 2] != '\r') {
             return false;
         }
 
         // now loop backward looking for the previous CRLF, or the beginning of the buffer
         int i = 0;
-        for (i = currentPosition-3 ; i >= 0; i--) {
+        for (i = currentPosition - 3; i >= 0; i--) {
             if (mBuffer[i] == '\n') {
                 // found \n!
-                if (i > 0 && mBuffer[i-1] == '\r') {
+                if (i > 0 && mBuffer[i - 1] == '\r') {
                     // found \r!
                     break;
                 }
@@ -762,7 +754,7 @@ public final class EmulatorConsole {
 
         // here it is either -1 if we reached the start of the buffer without finding
         // a CRLF, or the position of \n. So in both case we look at the characters at i+1 and i+2
-        if (mBuffer[i+1] == 'K' && mBuffer[i+2] == 'O') {
+        if (mBuffer[i + 1] == 'K' && mBuffer[i + 2] == 'O') {
             // found error!
             return true;
         }
@@ -775,7 +767,7 @@ public final class EmulatorConsole {
      */
     private boolean isValid(String[] result) {
         if (result != null && result.length > 0) {
-            return !(RE_KO.matcher(result[result.length-1]).matches());
+            return !(RE_KO.matcher(result[result.length - 1]).matches());
         }
         return false;
     }
@@ -786,7 +778,7 @@ public final class EmulatorConsole {
             int latency = Integer.parseInt(value);
 
             // check for the speed from the index
-            for (int i = 0 ; i < MIN_LATENCIES.length; i++) {
+            for (int i = 0; i < MIN_LATENCIES.length; i++) {
                 if (MIN_LATENCIES[i] == latency) {
                     return i;
                 }
@@ -804,7 +796,7 @@ public final class EmulatorConsole {
             int speed = Integer.parseInt(value);
 
             // check for the speed from the index
-            for (int i = 0 ; i < DOWNLOAD_SPEEDS.length; i++) {
+            for (int i = 0; i < DOWNLOAD_SPEEDS.length; i++) {
                 if (DOWNLOAD_SPEEDS[i] == speed) {
                     return i;
                 }
