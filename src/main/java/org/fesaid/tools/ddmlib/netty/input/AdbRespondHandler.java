@@ -3,6 +3,7 @@ package org.fesaid.tools.ddmlib.netty.input;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.util.ReferenceCountUtil;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +38,7 @@ public class AdbRespondHandler extends ChannelInboundHandlerAdapter implements A
                         okData.readByte() == (byte) 'K' &&
                         okData.readByte() == (byte) 'A' &&
                         okData.readByte() == (byte) 'Y';
+                    ReferenceCountUtil.release(okData);
                     channelRead(ctx, msg);
                 }
             } else {
@@ -45,18 +47,24 @@ public class AdbRespondHandler extends ChannelInboundHandlerAdapter implements A
                 } else {
                     if (Objects.isNull(messageLength)) {
                         if (byteBuf.readableBytes() >= MESSAGE_LENGTH) {
-                            String lengthString = byteBuf.readBytes(MESSAGE_LENGTH).toString(AdbHelper.DEFAULT_CHARSET);
+                            ByteBuf lengthData = byteBuf.readBytes(MESSAGE_LENGTH);
+                            String lengthString = lengthData.toString(AdbHelper.DEFAULT_CHARSET);
+                            ReferenceCountUtil.release(lengthData);
                             try {
                                 messageLength = Integer.parseInt(lengthString, 16);
                                 channelRead(ctx, msg);
                             } catch (Exception e) {
-                                message = lengthString + byteBuf.readBytes(byteBuf.readableBytes()).toString(AdbHelper.DEFAULT_CHARSET);
+                                ByteBuf leftData = byteBuf.readBytes(byteBuf.readableBytes());
+                                message = lengthString +leftData.toString(AdbHelper.DEFAULT_CHARSET);
+                                ReferenceCountUtil.release(leftData);
                                 finishRead(ctx, msg);
                             }
                         }
                     } else {
                         if (byteBuf.readableBytes() >= messageLength) {
-                            message = byteBuf.readBytes(messageLength).toString(AdbHelper.DEFAULT_CHARSET);
+                            ByteBuf messageData = byteBuf.readBytes(messageLength);
+                            message = messageData.toString(AdbHelper.DEFAULT_CHARSET);
+                            ReferenceCountUtil.release(messageData);
                             finishRead(ctx, msg);
                         }
                     }
