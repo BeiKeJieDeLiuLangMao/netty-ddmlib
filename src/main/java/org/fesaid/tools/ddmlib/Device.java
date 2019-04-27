@@ -10,6 +10,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Atomics;
+import io.netty.buffer.ByteBuf;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -479,6 +480,13 @@ final class Device implements IDevice {
         IOException {
         AdbHelper.executeRemoteCommand(AndroidDebugBridge.getSocketAddress(), command, this,
             receiver, DdmPreferences.getTimeOut(), TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    public ByteBuf executeShellCommand(String command, long timeout, TimeUnit timeUnit) throws TimeoutException,
+        AdbCommandRejectedException, IOException {
+        return AdbHelper.executeRemoteCommand(AndroidDebugBridge.getSocketAddress(), command, this, timeout,
+            timeUnit);
     }
 
     @Override

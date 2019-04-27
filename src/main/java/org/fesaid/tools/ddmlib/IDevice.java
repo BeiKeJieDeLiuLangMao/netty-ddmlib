@@ -3,6 +3,7 @@ package org.fesaid.tools.ddmlib;
 import com.android.annotations.NonNull;
 import com.android.annotations.Nullable;
 import com.android.sdklib.AndroidVersion;
+import io.netty.buffer.ByteBuf;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -163,6 +164,7 @@ public interface IDevice extends IShellEnabledDevice {
 
     /**
      * Returns the state of the device.
+     *
      * @return state
      */
     DeviceState getState();
@@ -180,13 +182,17 @@ public interface IDevice extends IShellEnabledDevice {
     @Nullable
     String getProperty(@NonNull String name);
 
-    /** Returns whether this device supports the given software feature
+    /**
+     * Returns whether this device supports the given software feature
+     *
      * @param feature feature
      * @return support or not
      */
     boolean supportsFeature(@NonNull Feature feature);
 
-    /** Returns whether this device supports the given hardware feature.
+    /**
+     * Returns whether this device supports the given hardware feature.
+     *
      * @param feature feature
      * @return support or not
      */
@@ -197,7 +203,6 @@ public interface IDevice extends IShellEnabledDevice {
      *
      * @param name the name of the mount point to return
      * @return mount point
-     *
      * @see #MNT_EXTERNAL_STORAGE
      * @see #MNT_ROOT
      * @see #MNT_DATA
@@ -214,6 +219,7 @@ public interface IDevice extends IShellEnabledDevice {
 
     /**
      * Returns <code>true</code> if the device is an emulator.
+     *
      * @return true if the device is an emulator
      */
     boolean isEmulator();
@@ -234,12 +240,14 @@ public interface IDevice extends IShellEnabledDevice {
 
     /**
      * Returns whether the {@link Device} has {@link Client}s.
+     *
      * @return whether the {@link Device} has {@link Client}s
      */
     boolean hasClients();
 
     /**
      * Returns the array of clients.
+     *
      * @return array of clients
      */
     Client[] getClients();
@@ -266,6 +274,7 @@ public interface IDevice extends IShellEnabledDevice {
 
     /**
      * Returns a {@link FileListingService} for this device.
+     *
      * @return {@link FileListingService} for this device
      */
     FileListingService getFileListingService();
@@ -325,6 +334,21 @@ public interface IDevice extends IShellEnabledDevice {
     void executeShellCommand(String command, IShellOutputReceiver receiver)
         throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException,
         IOException;
+
+    /**
+     * Execute a command, and finally return a {@link ByteBuf} which contains all stdout and stderr data
+     *
+     * @param command command
+     * @param timeout timeout
+     * @param timeUnit timeout unit
+     * @return all result data in a ByteBuf
+     * @throws TimeoutException in case of timeout on the connection.
+     * @throws AdbCommandRejectedException if adb rejects the command
+     * @throws ShellCommandUnresponsiveException in case the shell command doesn't send output for a given time.
+     * @throws IOException in case of I/O error on the connection.
+     */
+    ByteBuf executeShellCommand(String command, long timeout, TimeUnit timeUnit) throws TimeoutException,
+        AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException;
 
     /**
      * A version of executeShell command that can take an input stream to send through stdin.

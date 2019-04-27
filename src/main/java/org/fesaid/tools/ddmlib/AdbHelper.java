@@ -2,6 +2,7 @@ package org.fesaid.tools.ddmlib;
 
 import com.android.annotations.NonNull;
 import com.android.annotations.Nullable;
+import io.netty.buffer.ByteBuf;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
@@ -18,6 +19,9 @@ import org.fesaid.tools.ddmlib.netty.AdbConnector;
 import org.fesaid.tools.ddmlib.netty.AdbNettyConfig;
 import org.fesaid.tools.ddmlib.netty.input.AdbFrameHandler;
 import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
+import org.fesaid.tools.ddmlib.netty.input.FullByteBufInputHandler;
+
+import static org.fesaid.tools.ddmlib.AdbHelper.AdbService.SHELL;
 
 /**
  * Helper class to handle requests and connections to adb.
@@ -242,7 +246,7 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
         IOException {
         executeRemoteCommand(
             adbSockAddr,
-            AdbService.SHELL,
+            SHELL,
             command,
             device,
             rcvr,
@@ -275,7 +279,7 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
     static void executeRemoteCommand(InetSocketAddress adbSockAddr,
         String command, IDevice device, IShellOutputReceiver rcvr, long maxTimeToOutputResponse, TimeUnit maxTimeUnits)
         throws TimeoutException, AdbCommandRejectedException, ShellCommandUnresponsiveException, IOException {
-        executeRemoteCommand(adbSockAddr, AdbService.SHELL, command, device, rcvr, maxTimeToOutputResponse, maxTimeUnits,
+        executeRemoteCommand(adbSockAddr, SHELL, command, device, rcvr, maxTimeToOutputResponse, maxTimeUnits,
             null);
     }
 
@@ -338,6 +342,22 @@ import org.fesaid.tools.ddmlib.netty.input.AdbStreamInputHandler;
             }
             customRespondHandler.waitResponseBegin(maxTimeToOutputResponse, maxTimeUnits);
             customRespondHandler.waitFinish(maxTimeout, maxTimeUnits);
+        }
+    }
+
+    static ByteBuf executeRemoteCommand(InetSocketAddress address, String command, Device device, long timeout,
+        TimeUnit timeUnit) throws IOException, TimeoutException, AdbCommandRejectedException {
+        log.debug("Adb execute command: " + command);
+        try (AdbConnection adbConnection = adbConnector.connect(address, device.getSerialNumber())) {
+            // if the device is not -1, then we first tell adb we're looking to
+            // talk to a specific device
+            setDevice(adbConnection, device);
+            FullByteBufInputHandler customRespondHandler = new FullByteBufInputHandler();
+            adbConnection.sendAndWaitSuccess(
+                SHELL.name().toLowerCase() + ":" + command,
+                DdmPreferences.getTimeOut(),
+                TimeUnit.MILLISECONDS, customRespondHandler);
+            return customRespondHandler.waitEnd(timeout, timeUnit);
         }
     }
 
