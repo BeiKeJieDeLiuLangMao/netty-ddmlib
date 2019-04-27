@@ -9,12 +9,12 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioChannelOption;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.traffic.GlobalTrafficShapingHandler;
-import io.netty.util.concurrent.DefaultThreadFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
+import org.fesaid.tools.ddmlib.thread.NamedThreadFactory;
 
 /**
  * @author Chen Yang/CL10060-N/chen.yang@linecorp.com
@@ -29,7 +29,8 @@ public class AdbConnector extends ChannelDuplexHandler {
         this.config = config;
         bootstrap = new Bootstrap()
             .group(new NioEventLoopGroup(config.getEventLoopGroupWorkerThreadSize(),
-                new DefaultThreadFactory(config.getEventLoopGroupWorkerPrefix())))
+                new NamedThreadFactory(config.getEventLoopGroupWorkerPrefix(),
+                    config.getEventLoopGroupWorkerThreadSize())))
             .channel(NioSocketChannel.class)
             .handler(this)
             .option(NioChannelOption.CONNECT_TIMEOUT_MILLIS, config.getConnectTimeoutMills())

@@ -12,7 +12,6 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.ByteToMessageDecoder;
-import io.netty.util.concurrent.DefaultThreadFactory;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -35,6 +34,7 @@ import org.fesaid.tools.ddmlib.jdwp.JdwpEvent;
 import org.fesaid.tools.ddmlib.netty.AdbConnection;
 import org.fesaid.tools.ddmlib.netty.input.AdbInputHandler;
 import org.fesaid.tools.ddmlib.netty.input.DeviceMonitorHandler;
+import org.fesaid.tools.ddmlib.thread.NamedThreadFactory;
 import org.fesaid.tools.ddmlib.utils.DebuggerPorts;
 
 import static org.fesaid.tools.ddmlib.AdbHelper.connect;
@@ -52,8 +52,7 @@ import static org.fesaid.tools.ddmlib.AdbHelper.connect;
  * are multiplexed over a single selector.
  */
 @SuppressWarnings("unused")
-@Slf4j
-final class DeviceMonitor implements ClientTracker {
+@Slf4j final class DeviceMonitor implements ClientTracker {
     private static final String ADB_TRACK_DEVICES_COMMAND = "host:track-devices";
     private static final String ADB_TRACK_JDWP_COMMAND = "track-jdwp";
 
@@ -97,7 +96,7 @@ final class DeviceMonitor implements ClientTracker {
     private synchronized void createJdwpTrackerIfNecessary() {
         if (Objects.isNull(jdwpTrackExecutor)) {
             log.debug("createJdwpTracker");
-            jdwpTrackExecutor = new ScheduledThreadPoolExecutor(1, new DefaultThreadFactory("JdwpTracker"));
+            jdwpTrackExecutor = new ScheduledThreadPoolExecutor(1, new NamedThreadFactory("JdwpTracker", 1));
             jdwpTrackExecutor.scheduleAtFixedRate(this::deviceClientMonitorLoop, 0, 1, TimeUnit.SECONDS);
         }
     }
@@ -536,7 +535,7 @@ final class DeviceMonitor implements ClientTracker {
             mBridge = bridge;
             mListener = listener;
             scheduledExecutorService = new ScheduledThreadPoolExecutor(1,
-                new DefaultThreadFactory("DeviceListMonitor"));
+                new NamedThreadFactory("DeviceListMonitor", 1));
             scheduledExecutorService.scheduleAtFixedRate(this, 0, 1, TimeUnit.SECONDS);
         }
 

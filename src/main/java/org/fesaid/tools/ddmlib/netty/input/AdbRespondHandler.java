@@ -33,10 +33,11 @@ public class AdbRespondHandler extends ChannelInboundHandlerAdapter implements A
             ByteBuf byteBuf = (ByteBuf) msg;
             if (Objects.isNull(okay)) {
                 if (byteBuf.readableBytes() >= OKAY_SIZE) {
-                    okay = byteBuf.readByte() == (byte) 'O' &&
-                        byteBuf.readByte() == (byte) 'K' &&
-                        byteBuf.readByte() == (byte) 'A' &&
-                        byteBuf.readByte() == (byte) 'Y';
+                    ByteBuf okData = byteBuf.readBytes(OKAY_SIZE);
+                    okay = okData.readByte() == (byte) 'O' &&
+                        okData.readByte() == (byte) 'K' &&
+                        okData.readByte() == (byte) 'A' &&
+                        okData.readByte() == (byte) 'Y';
                     channelRead(ctx, msg);
                 }
             } else {
