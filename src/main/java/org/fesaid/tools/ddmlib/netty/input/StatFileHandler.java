@@ -19,6 +19,10 @@ public class StatFileHandler extends ByteToMessageDecoder implements AdbInputHan
     private byte[] statResult = new byte[STATE_RESULT_LENGTH];
     private CountDownLatch done = new CountDownLatch(1);
 
+    public StatFileHandler() {
+        setCumulator(COMPOSITE_CUMULATOR);
+    }
+
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
         if (done.getCount() > 0) {

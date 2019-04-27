@@ -3,6 +3,7 @@ package org.fesaid.tools.ddmlib.netty.input;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.util.ReferenceCountUtil;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,7 @@ public class AdbStreamInputHandler extends ChannelInboundHandlerAdapter implemen
                             break;
                         }
                     }
+                    ReferenceCountUtil.release(msg);
                 }
             } else {
                 unhandledData(ctx, msg);

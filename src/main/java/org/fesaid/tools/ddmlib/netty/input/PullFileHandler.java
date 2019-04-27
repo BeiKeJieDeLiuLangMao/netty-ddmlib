@@ -43,6 +43,7 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
     public PullFileHandler(SyncService.ISyncProgressMonitor monitor, File localFile) {
         this.monitor = monitor;
         this.localFile = localFile;
+        setCumulator(COMPOSITE_CUMULATOR);
     }
 
     @Override

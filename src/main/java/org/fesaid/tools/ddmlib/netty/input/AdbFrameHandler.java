@@ -31,6 +31,10 @@ public class AdbFrameHandler extends ByteToMessageDecoder implements AdbInputHan
     private boolean success;
     private Throwable cause;
 
+    public AdbFrameHandler() {
+        setCumulator(COMPOSITE_CUMULATOR);
+    }
+
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         if (finish.getCount() > 0) {

@@ -29,6 +29,10 @@ public class PushFileHandler extends ByteToMessageDecoder implements AdbInputHan
     private SyncException cause;
     private int dataLength;
 
+    public PushFileHandler() {
+        setCumulator(COMPOSITE_CUMULATOR);
+    }
+
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws SyncException {
         switch (state) {

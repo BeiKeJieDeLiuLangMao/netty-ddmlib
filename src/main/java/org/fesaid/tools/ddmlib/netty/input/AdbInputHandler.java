@@ -2,6 +2,7 @@ package org.fesaid.tools.ddmlib.netty.input;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandler;
+import io.netty.util.ReferenceCountUtil;
 import java.util.Objects;
 
 /**
@@ -20,6 +21,8 @@ public interface AdbInputHandler extends ChannelInboundHandler {
         // avoid "Discarded inbound message" warnings.
         if (!Objects.equals(ctx.pipeline().last(), this)) {
             ctx.fireChannelRead(msg);
+        } else {
+            ReferenceCountUtil.release(msg);
         }
     }
 }

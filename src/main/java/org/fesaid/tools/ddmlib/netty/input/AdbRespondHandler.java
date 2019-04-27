@@ -43,7 +43,7 @@ public class AdbRespondHandler extends ChannelInboundHandlerAdapter implements A
                 }
             } else {
                 if (okay) {
-                    finishRead(ctx, msg);
+                    finish(ctx, msg);
                 } else {
                     if (Objects.isNull(messageLength)) {
                         if (byteBuf.readableBytes() >= MESSAGE_LENGTH) {
@@ -57,7 +57,7 @@ public class AdbRespondHandler extends ChannelInboundHandlerAdapter implements A
                                 ByteBuf leftData = byteBuf.readBytes(byteBuf.readableBytes());
                                 message = lengthString +leftData.toString(AdbHelper.DEFAULT_CHARSET);
                                 ReferenceCountUtil.release(leftData);
-                                finishRead(ctx, msg);
+                                finish(ctx, msg);
                             }
                         }
                     } else {
@@ -65,7 +65,7 @@ public class AdbRespondHandler extends ChannelInboundHandlerAdapter implements A
                             ByteBuf messageData = byteBuf.readBytes(messageLength);
                             message = messageData.toString(AdbHelper.DEFAULT_CHARSET);
                             ReferenceCountUtil.release(messageData);
-                            finishRead(ctx, msg);
+                            finish(ctx, msg);
                         }
                     }
                 }
@@ -82,7 +82,7 @@ public class AdbRespondHandler extends ChannelInboundHandlerAdapter implements A
         respondCountDown.countDown();
     }
 
-    private void finishRead(ChannelHandlerContext ctx, Object msg) {
+    private void finish(ChannelHandlerContext ctx, Object msg) {
         respondCountDown.countDown();
         unhandledData(ctx, msg);
     }
