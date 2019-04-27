@@ -110,6 +110,11 @@ public class IDeviceTest implements TrafficHandlerGetter, AndroidDebugBridge.IDe
     }
 
     @Test
+    public void testScreenshot() throws AdbCommandRejectedException, IOException, TimeoutException {
+        device.getScreenshot();
+    }
+
+    @Test
     public void testPushFile() throws TimeoutException, AdbCommandRejectedException, SyncException, IOException {
         device.pushFile(Objects.requireNonNull(this.getClass().getClassLoader().getResource("testFile.jpg"))
             .getFile(), "/data/local/tmp/testFile.jpg");
@@ -125,6 +130,7 @@ public class IDeviceTest implements TrafficHandlerGetter, AndroidDebugBridge.IDe
     public void testPullFile() throws TimeoutException, AdbCommandRejectedException, SyncException, IOException {
         testPushFile();
         device.pullFile("/data/local/tmp/testFile.jpg", System.getProperty("java.io.tmpdir") + "testFile.jpg");
+        System.out.println(System.getProperty("java.io.tmpdir") + "testFile.jpg");
     }
 
 }

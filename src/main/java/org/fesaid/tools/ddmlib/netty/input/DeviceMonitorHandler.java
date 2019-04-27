@@ -15,16 +15,18 @@ import org.fesaid.tools.ddmlib.IDevice;
  */
 public class DeviceMonitorHandler extends ByteToMessageDecoder implements AdbInputHandler {
     private static final int LENGTH_FIELD_SIZE = 4;
-    private final byte[] mLengthBuffer = new byte[LENGTH_FIELD_SIZE];
     private int length;
     private boolean needLengthData = true;
+
+    public DeviceMonitorHandler() {
+        setCumulator(COMPOSITE_CUMULATOR);
+    }
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
         if (needLengthData) {
             if (in.readableBytes() >= LENGTH_FIELD_SIZE) {
-                in.readBytes(mLengthBuffer, 0, LENGTH_FIELD_SIZE);
-                length = Integer.parseInt(new String(mLengthBuffer, AdbHelper.DEFAULT_CHARSET), 16);
+                length = Integer.parseInt(in.readBytes(LENGTH_FIELD_SIZE).toString(AdbHelper.DEFAULT_CHARSET), 16);
                 if (length <= 0) {
                     out.add(new HashMap<String, IDevice.DeviceState>(0));
                 } else {
@@ -34,9 +36,7 @@ public class DeviceMonitorHandler extends ByteToMessageDecoder implements AdbInp
         } else {
             Map<String, IDevice.DeviceState> deviceStateMap = Maps.newHashMap();
             if (in.readableBytes() >= length) {
-                byte[] data = new byte[length];
-                in.readBytes(data, 0, length);
-                String result = new String(data, AdbHelper.DEFAULT_CHARSET);
+                String result = in.readBytes(length).toString(AdbHelper.DEFAULT_CHARSET);
                 String[] devices = result.split("\n");
                 for (String d : devices) {
                     String[] param = d.split("\t");

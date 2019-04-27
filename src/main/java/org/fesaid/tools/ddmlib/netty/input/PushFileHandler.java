@@ -6,6 +6,7 @@ import io.netty.handler.codec.ByteToMessageDecoder;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.fesaid.tools.ddmlib.AdbHelper;
 import org.fesaid.tools.ddmlib.SyncException;
 import org.fesaid.tools.ddmlib.SyncService;
 import org.fesaid.tools.ddmlib.TimeoutException;
@@ -19,7 +20,7 @@ import static org.fesaid.tools.ddmlib.utils.ArrayHelper.swap32bitFromArray;
 /**
  * @author Chen Yang/CL10060-N/chen.yang@linecorp.com
  */
-public class PushFileHandler extends ByteToMessageDecoder implements AdbInputHandler{
+public class PushFileHandler extends ByteToMessageDecoder implements AdbInputHandler {
 
     private byte[] headerData = new byte[HEADER_LENGTH];
     private SyncService.State state = WAIT_HEADER;
@@ -27,7 +28,6 @@ public class PushFileHandler extends ByteToMessageDecoder implements AdbInputHan
     private boolean success;
     private SyncException cause;
     private int dataLength;
-    private byte[] data;
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws SyncException {
@@ -40,8 +40,8 @@ public class PushFileHandler extends ByteToMessageDecoder implements AdbInputHan
                 break;
             case WAIT_ERROR_MESSAGE:
                 if (in.readableBytes() >= dataLength) {
-                    in.readBytes(data, 0, dataLength);
-                    throw new SyncException(TRANSFER_PROTOCOL_ERROR, new String(data, 0, dataLength));
+                    throw new SyncException(TRANSFER_PROTOCOL_ERROR,
+                        in.readBytes(dataLength).toString(AdbHelper.DEFAULT_CHARSET));
                 }
                 break;
             case WAIT_DATA:
@@ -78,10 +78,9 @@ public class PushFileHandler extends ByteToMessageDecoder implements AdbInputHan
         if (isOkayHeader()) {
             success = true;
             done.countDown();
-        } else if (isFailHeader()){
+        } else if (isFailHeader()) {
             state = WAIT_ERROR_MESSAGE;
             dataLength = swap32bitFromArray(headerData, 4);
-            data = new byte[dataLength];
         } else {
             throw new SyncException(SyncException.SyncError.TRANSFER_PROTOCOL_ERROR);
         }

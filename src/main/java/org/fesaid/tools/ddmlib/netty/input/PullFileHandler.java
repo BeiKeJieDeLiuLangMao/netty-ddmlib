@@ -4,11 +4,13 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.fesaid.tools.ddmlib.AdbHelper;
 import org.fesaid.tools.ddmlib.SyncException;
 import org.fesaid.tools.ddmlib.SyncService;
 import org.fesaid.tools.ddmlib.TimeoutException;
@@ -31,9 +33,8 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
     private CountDownLatch respondBegin = new CountDownLatch(1);
     private CountDownLatch done = new CountDownLatch(1);
     private SyncService.ISyncProgressMonitor monitor;
-    private byte[] data = new byte[SYNC_DATA_MAX + 8];
     private File localFile;
-    private FileOutputStream fileOutputStream;
+    private FileChannel fileChannel;
     private boolean success;
     private SyncException cause;
     private SyncService.State state = WAIT_HEADER;
@@ -58,14 +59,13 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
                 break;
             case WAIT_DATA:
                 if (in.readableBytes() >= dataLength) {
-                    in.readBytes(data, 0, dataLength);
-                    handleDataRead();
+                    handleSaveData(in);
                 }
                 break;
             case WAIT_ERROR_MESSAGE:
                 if (in.readableBytes() >= dataLength) {
-                    in.readBytes(data, 0, dataLength);
-                    throw new SyncException(TRANSFER_PROTOCOL_ERROR, new String(data, 0, dataLength));
+                    throw new SyncException(TRANSFER_PROTOCOL_ERROR,
+                        in.readBytes(dataLength).toString(AdbHelper.DEFAULT_CHARSET));
                 }
                 break;
             default:
@@ -96,16 +96,16 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
         }
     }
 
-    private void handleDataRead() throws IOException {
+    private void handleSaveData(ByteBuf in) throws IOException {
         makeSureFileCreated();
-        fileOutputStream.write(data, 0, dataLength);
-        fileOutputStream.flush();
+        fileChannel.write(in.nioBuffer(in.readerIndex(), dataLength));
+        in.readerIndex(in.readerIndex() + dataLength);
         monitor.advance(dataLength);
         state = WAIT_HEADER;
     }
 
     private void makeSureFileCreated() throws IOException {
-        if (fileOutputStream == null) {
+        if (fileChannel == null) {
             if (!localFile.exists()) {
                 if (!localFile.getParentFile().exists()) {
                     if (!localFile.getParentFile().mkdir()) {
@@ -116,15 +116,15 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
                     throw new IOException("Create file failed.");
                 }
             }
-            fileOutputStream = new FileOutputStream(localFile);
+            fileChannel = FileChannel.open(localFile.toPath(), StandardOpenOption.WRITE);
         }
     }
 
     private void finished() {
         success = true;
-        if (fileOutputStream != null) {
+        if (fileChannel != null) {
             try {
-                fileOutputStream.close();
+                fileChannel.close();
             } catch (IOException ignored) {
             }
         }
@@ -133,9 +133,9 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        if (fileOutputStream != null) {
+        if (fileChannel != null) {
             try {
-                fileOutputStream.close();
+                fileChannel.close();
             } catch (IOException ignored) {
             }
         }
