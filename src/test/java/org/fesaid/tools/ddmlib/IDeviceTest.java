@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -28,26 +29,29 @@ public class IDeviceTest implements TrafficHandlerGetter, AndroidDebugBridge.IDe
     private static final GlobalTrafficShapingHandler GLOBAL_TRAFFIC_HANDLER;
     @SuppressWarnings("OctalInteger")
     private static final int MODE = 0664;
-    private IDevice device;
+    private static IDevice device;
 
     static {
         EXECUTOR = new ScheduledThreadPoolExecutor(THREAD_SIZE, new DefaultThreadFactory(THREAD_NAME_PREFIX, THREAD_SIZE));
-        GLOBAL_TRAFFIC_HANDLER = new GlobalTrafficShapingHandler(EXECUTOR,
-            100 * 1024 * 1024, 100 * 1024 * 1024);
+        GLOBAL_TRAFFIC_HANDLER = new GlobalTrafficShapingHandler(EXECUTOR, 100 * 1024 * 1024, 100 * 1024 * 1024);
     }
 
     @Before
     public synchronized void initDevice() throws InterruptedException {
-        AdbNettyConfig adbNettyConfig = new AdbNettyConfig();
-        adbNettyConfig.setTrafficHandlerGetter(this);
-        AndroidDebugBridge.addDeviceChangeListener(this);
-        AndroidDebugBridge.initIfNeeded(false, adbNettyConfig);
-        AndroidDebugBridge.createBridge();
-        while (true) {
-            if (device == null) {
-                Thread.sleep(1);
-            } else {
-                break;
+        if (device == null) {
+            log.info("Begin init device");
+            AdbNettyConfig adbNettyConfig = new AdbNettyConfig();
+            adbNettyConfig.setTrafficHandlerGetter(this);
+            AndroidDebugBridge.addDeviceChangeListener(this);
+            AndroidDebugBridge.initIfNeeded(false, adbNettyConfig);
+            AndroidDebugBridge.createBridge();
+            while (true) {
+                if (device == null) {
+                    Thread.sleep(100);
+                    log.debug("wait device...");
+                } else {
+                    break;
+                }
             }
         }
     }
@@ -56,8 +60,7 @@ public class IDeviceTest implements TrafficHandlerGetter, AndroidDebugBridge.IDe
     public GlobalTrafficShapingHandler getDeviceTrafficHandler(String serialNumber) {
         synchronized (DEVICE_TRAFFIC_HANDLER) {
             if (!DEVICE_TRAFFIC_HANDLER.containsKey(serialNumber)) {
-                DEVICE_TRAFFIC_HANDLER.put(serialNumber, new GlobalTrafficShapingHandler(EXECUTOR,
-                    1024 * 1024, 1024 * 1024));
+                DEVICE_TRAFFIC_HANDLER.put(serialNumber, new GlobalTrafficShapingHandler(EXECUTOR, 1024 * 1024, 1024 * 1024));
             }
             return DEVICE_TRAFFIC_HANDLER.get(serialNumber);
         }
@@ -71,66 +74,73 @@ public class IDeviceTest implements TrafficHandlerGetter, AndroidDebugBridge.IDe
     @Override
     public void deviceConnected(IDevice device) {
         log.info("deviceConnected, {}", device);
-        this.device = device;
+        IDeviceTest.device = device;
     }
 
     @Override
     public void deviceDisconnected(IDevice device) {
         log.info("deviceDisconnected, {}", device);
-        this.device = device;
+        IDeviceTest.device = device;
     }
 
     @Override
     public void deviceChanged(IDevice device, int changeMask) {
         log.info("deviceChanged, {}", device);
-        this.device = device;
+        IDeviceTest.device = device;
     }
 
     static class TrafficCounterTracker implements Runnable {
         @Override
         public void run() {
             DEVICE_TRAFFIC_HANDLER.forEach((serialNumber, handler) ->
-                log.info("{}: read :{}, write: {}", serialNumber, handler.trafficCounter().lastReadThroughput(),
-                    handler.trafficCounter().lastWriteThroughput())
-            );
-            log.info("Global: read: {}, write: {}", GLOBAL_TRAFFIC_HANDLER.trafficCounter().lastReadThroughput(),
-                GLOBAL_TRAFFIC_HANDLER.trafficCounter().lastWriteThroughput());
+                log.info("{}: read :{}, write: {}", serialNumber, handler.trafficCounter().lastReadThroughput(), handler.trafficCounter().lastWriteThroughput()));
+            log.info("Global: read: {}, write: {}", GLOBAL_TRAFFIC_HANDLER.trafficCounter().lastReadThroughput(), GLOBAL_TRAFFIC_HANDLER.trafficCounter().lastWriteThroughput());
         }
     }
 
     @Test
-    public void testTrafficLimit() throws InterruptedException {
-        EXECUTOR.scheduleAtFixedRate(new TrafficCounterTracker(), 1, 1, TimeUnit.SECONDS);
-        Thread.sleep(100000);
+    public void testTrafficLimit() throws AdbCommandRejectedException, IOException, TimeoutException {
+        log.info("testTrafficLimit begin");
+        Future future = EXECUTOR.scheduleAtFixedRate(new TrafficCounterTracker(), 1, 1, TimeUnit.SECONDS);
+        device.getScreenshot();
+        future.cancel(true);
+        log.info("testTrafficLimit end");
     }
 
     @Test
     public void testMonitor() throws InterruptedException {
-        Thread.sleep(100000);
+        log.info("testMonitor begin");
+        Thread.sleep(1000);
+        log.info("testMonitor end");
     }
 
     @Test
     public void testScreenshot() throws AdbCommandRejectedException, IOException, TimeoutException {
+        log.info("testScreenshot begin");
         device.getScreenshot();
+        log.info("testScreenshot end");
     }
 
     @Test
     public void testPushFile() throws TimeoutException, AdbCommandRejectedException, SyncException, IOException {
-        device.pushFile(Objects.requireNonNull(this.getClass().getClassLoader().getResource("testFile.jpg"))
-            .getFile(), "/data/local/tmp/testFile.jpg");
+        log.info("testPushFile begin");
+        device.pushFile(Objects.requireNonNull(this.getClass().getClassLoader().getResource("testFile.jpg")).getFile(), "/data/local/tmp/testFile.jpg");
+        log.info("testPushFile end");
     }
 
     @Test
     public void testPushStream() throws IOException, TimeoutException, AdbCommandRejectedException, SyncException {
-        device.pushFile(new FileInputStream(Objects.requireNonNull(this.getClass().getClassLoader()
-            .getResource("testFile.jpg")).getFile()), "/data/local/tmp/testFile.jpg", MODE);
+        log.info("testPushStream begin");
+        device.pushFile(new FileInputStream(Objects.requireNonNull(this.getClass().getClassLoader().getResource("testFile.jpg")).getFile()), "/data/local/tmp/testFile.jpg", MODE);
+        log.info("testPushStream end");
     }
 
     @Test
     public void testPullFile() throws TimeoutException, AdbCommandRejectedException, SyncException, IOException {
-        testPushFile();
+        log.info("testPullFile begin");
+        device.pushFile(Objects.requireNonNull(this.getClass().getClassLoader().getResource("testFile.jpg")).getFile(), "/data/local/tmp/testFile.jpg");
         device.pullFile("/data/local/tmp/testFile.jpg", System.getProperty("java.io.tmpdir") + "testFile.jpg");
-        System.out.println(System.getProperty("java.io.tmpdir") + "testFile.jpg");
+        log.info("testPullFile end");
     }
 
 }
