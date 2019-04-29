@@ -16,8 +16,8 @@ import org.fesaid.tools.ddmlib.utils.ArrayHelper;
 public class StatFileHandler extends ByteToMessageDecoder implements AdbInputHandler{
 
     private static final int STATE_RESULT_LENGTH = 16;
-    private byte[] statResult = new byte[STATE_RESULT_LENGTH];
     private CountDownLatch done = new CountDownLatch(1);
+    private SyncService.FileStat stat = null;
 
     public StatFileHandler() {
         setCumulator(COMPOSITE_CUMULATOR);
@@ -27,7 +27,15 @@ public class StatFileHandler extends ByteToMessageDecoder implements AdbInputHan
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
         if (done.getCount() > 0) {
             if (in.readableBytes() >= STATE_RESULT_LENGTH) {
-                in.readBytes(statResult, 0, STATE_RESULT_LENGTH);
+                ByteBuf statResult = in.readSlice(STATE_RESULT_LENGTH);
+                if (isStatHeader(statResult)) {
+                    stat = new SyncService.FileStat(
+                        statResult.getIntLE(4),
+                        statResult.getIntLE(8),
+                        statResult.getIntLE(12));
+                } else {
+                    stat = null;
+                }
                 done.countDown();
                 ctx.pipeline().remove(this);
                 if (in.isReadable()) {
@@ -46,23 +54,16 @@ public class StatFileHandler extends ByteToMessageDecoder implements AdbInputHan
             } else {
                 done.await();
             }
-            if (isStatHeader()) {
-                return new SyncService.FileStat(
-                    ArrayHelper.swap32bitFromArray(statResult, 4),
-                    ArrayHelper.swap32bitFromArray(statResult, 8),
-                    ArrayHelper.swap32bitFromArray(statResult, 12));
-            } else {
-                return null;
-            }
+            return stat;
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted", e);
         }
     }
 
-    private boolean isStatHeader() {
-        return statResult[0] == 'S' &&
-            statResult[1] == 'T' &&
-            statResult[2] == 'A' &&
-            statResult[3] == 'T';
+    private boolean isStatHeader(ByteBuf statResult) {
+        return statResult.getByte(0) == 'S' &&
+            statResult.getByte(1) == 'T' &&
+            statResult.getByte(2) == 'A' &&
+            statResult.getByte(3) == 'T';
     }
 }

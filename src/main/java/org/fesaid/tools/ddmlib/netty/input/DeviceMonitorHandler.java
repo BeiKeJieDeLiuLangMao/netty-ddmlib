@@ -4,6 +4,7 @@ import com.google.common.collect.Maps;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
+import io.netty.util.ReferenceCountUtil;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +27,7 @@ public class DeviceMonitorHandler extends ByteToMessageDecoder implements AdbInp
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
         if (needLengthData) {
             if (in.readableBytes() >= LENGTH_FIELD_SIZE) {
-                length = Integer.parseInt(in.readBytes(LENGTH_FIELD_SIZE).toString(AdbHelper.DEFAULT_CHARSET), 16);
+                length = Integer.parseInt(in.readSlice(LENGTH_FIELD_SIZE).toString(AdbHelper.DEFAULT_CHARSET), 16);
                 if (length <= 0) {
                     out.add(new HashMap<String, IDevice.DeviceState>(0));
                 } else {
@@ -36,7 +37,7 @@ public class DeviceMonitorHandler extends ByteToMessageDecoder implements AdbInp
         } else {
             Map<String, IDevice.DeviceState> deviceStateMap = Maps.newHashMap();
             if (in.readableBytes() >= length) {
-                String result = in.readBytes(length).toString(AdbHelper.DEFAULT_CHARSET);
+                String result = in.readSlice(length).toString(AdbHelper.DEFAULT_CHARSET);
                 String[] devices = result.split("\n");
                 for (String d : devices) {
                     String[] param = d.split("\t");
