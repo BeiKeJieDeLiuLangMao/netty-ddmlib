@@ -22,7 +22,6 @@ import static org.fesaid.tools.ddmlib.utils.ArrayHelper.swap32bitFromArray;
  */
 public class PushFileHandler extends ByteToMessageDecoder implements AdbInputHandler {
 
-    private byte[] headerData = new byte[HEADER_LENGTH];
     private SyncService.State state = WAIT_HEADER;
     private CountDownLatch done = new CountDownLatch(1);
     private boolean success;
@@ -38,14 +37,12 @@ public class PushFileHandler extends ByteToMessageDecoder implements AdbInputHan
         switch (state) {
             case WAIT_HEADER:
                 if (in.readableBytes() >= HEADER_LENGTH) {
-                    in.readBytes(headerData);
-                    handleHeaderRead();
+                    handleHeaderRead(in.readSlice(HEADER_LENGTH));
                 }
                 break;
             case WAIT_ERROR_MESSAGE:
                 if (in.readableBytes() >= dataLength) {
-                    throw new SyncException(TRANSFER_PROTOCOL_ERROR,
-                        in.readBytes(dataLength).toString(AdbHelper.DEFAULT_CHARSET));
+                    throw new SyncException(TRANSFER_PROTOCOL_ERROR, in.readSlice(dataLength).toString(AdbHelper.DEFAULT_CHARSET));
                 }
                 break;
             case WAIT_DATA:
@@ -78,29 +75,29 @@ public class PushFileHandler extends ByteToMessageDecoder implements AdbInputHan
         }
     }
 
-    private void handleHeaderRead() throws SyncException {
-        if (isOkayHeader()) {
+    private void handleHeaderRead(ByteBuf headerData) throws SyncException {
+        if (isOkayHeader(headerData)) {
             success = true;
             done.countDown();
-        } else if (isFailHeader()) {
+        } else if (isFailHeader(headerData)) {
             state = WAIT_ERROR_MESSAGE;
-            dataLength = swap32bitFromArray(headerData, 4);
+            dataLength = headerData.getIntLE(4);
         } else {
             throw new SyncException(SyncException.SyncError.TRANSFER_PROTOCOL_ERROR);
         }
     }
 
-    private boolean isOkayHeader() {
-        return headerData[0] == 'O' &&
-            headerData[1] == 'K' &&
-            headerData[2] == 'A' &&
-            headerData[3] == 'Y';
+    private boolean isOkayHeader(ByteBuf headerData) {
+        return headerData.getByte(0) == 'O' &&
+            headerData.getByte(1) == 'K' &&
+            headerData.getByte(2) == 'A' &&
+            headerData.getByte(3) == 'Y';
     }
 
-    private boolean isFailHeader() {
-        return headerData[0] == 'F' &&
-            headerData[1] == 'A' &&
-            headerData[2] == 'I' &&
-            headerData[3] == 'L';
+    private boolean isFailHeader(ByteBuf headerData) {
+        return headerData.getByte(0) == 'F' &&
+            headerData.getByte(1) == 'A' &&
+            headerData.getByte(2) == 'I' &&
+            headerData.getByte(3) == 'L';
     }
 }

@@ -29,7 +29,6 @@ import static org.fesaid.tools.ddmlib.utils.ArrayHelper.swap32bitFromArray;
  */
 public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHandler {
 
-    private byte[] headerData = new byte[HEADER_LENGTH];
     private CountDownLatch respondBegin = new CountDownLatch(1);
     private CountDownLatch done = new CountDownLatch(1);
     private SyncService.ISyncProgressMonitor monitor;
@@ -54,8 +53,7 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
         switch (state) {
             case WAIT_HEADER:
                 if (in.readableBytes() >= HEADER_LENGTH) {
-                    in.readBytes(headerData);
-                    handleHeaderRead();
+                    handleHeaderRead(in.readSlice(HEADER_LENGTH));
                 }
                 break;
             case WAIT_DATA:
@@ -65,8 +63,7 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
                 break;
             case WAIT_ERROR_MESSAGE:
                 if (in.readableBytes() >= dataLength) {
-                    throw new SyncException(TRANSFER_PROTOCOL_ERROR,
-                        in.readBytes(dataLength).toString(AdbHelper.DEFAULT_CHARSET));
+                    throw new SyncException(TRANSFER_PROTOCOL_ERROR, in.readSlice(dataLength).toString(AdbHelper.DEFAULT_CHARSET));
                 }
                 break;
             default:
@@ -74,24 +71,28 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
         }
     }
 
-    private void handleHeaderRead() throws SyncException, IOException {
+    private void handleHeaderRead(ByteBuf headerData) throws SyncException, IOException {
         if (respondBegin.getCount() > 0) {
-            respondBegin.countDown();
+            if (!isDataHeader(headerData) && !isDoneHeader(headerData) && !isFailHeader(headerData)) {
+                throw new SyncException(TRANSFER_PROTOCOL_ERROR);
+            } else {
+                respondBegin.countDown();
+            }
         }
-        if (isDataHeader()) {
+        if (isDataHeader(headerData)) {
             state = WAIT_DATA;
-            dataLength = swap32bitFromArray(headerData, 4);
+            dataLength = headerData.getIntLE(4);
             if (dataLength > SYNC_DATA_MAX) {
                 // buffer overrun!
                 // error and exit
                 throw new SyncException(SyncException.SyncError.BUFFER_OVERRUN);
             }
-        } else if (isDoneHeader()) {
+        } else if (isDoneHeader(headerData)) {
             makeSureFileCreated();
             finished();
-        } else if (isFailHeader()) {
+        } else if (isFailHeader(headerData)) {
             state = WAIT_ERROR_MESSAGE;
-            dataLength = swap32bitFromArray(headerData, 4);
+            dataLength = headerData.getIntLE(4);
         } else {
             throw new SyncException(TRANSFER_PROTOCOL_ERROR);
         }
@@ -148,6 +149,7 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
         } else {
             this.cause = new SyncException(TRANSFER_PROTOCOL_ERROR, cause);
         }
+        respondBegin.countDown();
         done.countDown();
     }
 
@@ -156,8 +158,8 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
             if (!respondBegin.await(out, milliseconds)) {
                 throw new TimeoutException("wait result timeout.");
             }
-            if (!isDataHeader() && !isDoneHeader()) {
-                throw new SyncException(TRANSFER_PROTOCOL_ERROR);
+            if (cause != null) {
+                throw cause;
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -175,24 +177,24 @@ public class PullFileHandler extends ByteToMessageDecoder implements AdbInputHan
         }
     }
 
-    private boolean isDataHeader() {
-        return headerData[0] == 'D' &&
-            headerData[1] == 'A' &&
-            headerData[2] == 'T' &&
-            headerData[3] == 'A';
+    private boolean isDataHeader(ByteBuf headerData) {
+        return headerData.getByte(0) == 'D' &&
+            headerData.getByte(1) == 'A' &&
+            headerData.getByte(2) == 'T' &&
+            headerData.getByte(3) == 'A';
     }
 
-    private boolean isDoneHeader() {
-        return headerData[0] == 'D' &&
-            headerData[1] == 'O' &&
-            headerData[2] == 'N' &&
-            headerData[3] == 'E';
+    private boolean isDoneHeader(ByteBuf headerData) {
+        return headerData.getByte(0) == 'D' &&
+            headerData.getByte(1) == 'O' &&
+            headerData.getByte(2) == 'N' &&
+            headerData.getByte(3) == 'E';
     }
 
-    private boolean isFailHeader() {
-        return headerData[0] == 'F' &&
-            headerData[1] == 'A' &&
-            headerData[2] == 'I' &&
-            headerData[3] == 'L';
+    private boolean isFailHeader(ByteBuf headerData) {
+        return headerData.getByte(0) == 'F' &&
+            headerData.getByte(1) == 'A' &&
+            headerData.getByte(2) == 'I' &&
+            headerData.getByte(3) == 'L';
     }
 }
