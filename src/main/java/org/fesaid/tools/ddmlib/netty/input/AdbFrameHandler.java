@@ -21,8 +21,6 @@ import org.fesaid.tools.ddmlib.TimeoutException;
 public class AdbFrameHandler extends ByteToMessageDecoder implements AdbInputHandler {
 
     private static final int VERSION_FIELD_SIZE = 4;
-    private byte[] versionBytes = new byte[4];
-    private byte[] headerBytes;
     private RawImage imageParams = new RawImage();
     private Integer version;
     private boolean readHeader = false;
@@ -48,20 +46,13 @@ public class AdbFrameHandler extends ByteToMessageDecoder implements AdbInputHan
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
         if (Objects.isNull(version)) {
             if (in.readableBytes() >= VERSION_FIELD_SIZE) {
-                in.readBytes(versionBytes, 0, 4);
-                ByteBuffer buf = ByteBuffer.wrap(versionBytes);
-                buf.order(ByteOrder.LITTLE_ENDIAN);
-                version = buf.getInt();
-                headerBytes = new byte[RawImage.getHeaderSize(version) * 4];
+                version = in.readSlice(4).getIntLE(0);
                 log.debug("Image version, " + version);
             }
         } else if (!readHeader) {
-            if (in.readableBytes() >= headerBytes.length) {
+            if (in.readableBytes() >= getHeaderSize()) {
                 readHeader = true;
-                in.readBytes(headerBytes, 0, headerBytes.length);
-                ByteBuffer buf = ByteBuffer.wrap(headerBytes);
-                buf.order(ByteOrder.LITTLE_ENDIAN);
-                if (!imageParams.readHeader(version, buf)) {
+                if (!imageParams.readHeader(version, in.readSlice(getHeaderSize()).nioBuffer().order(ByteOrder.LITTLE_ENDIAN))) {
                     imageParams = null;
                     finish.countDown();
                 }
@@ -79,6 +70,10 @@ public class AdbFrameHandler extends ByteToMessageDecoder implements AdbInputHan
                 finish.countDown();
             }
         }
+    }
+
+    private int getHeaderSize() {
+        return RawImage.getHeaderSize(version) * 4;
     }
 
     @Override
