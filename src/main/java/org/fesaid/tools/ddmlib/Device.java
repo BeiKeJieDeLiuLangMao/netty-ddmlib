@@ -14,7 +14,6 @@ import io.netty.buffer.ByteBuf;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,8 +35,7 @@ import static com.android.sdklib.AndroidVersion.VersionCodes.KITKAT;
 /**
  * A Device. It can be a physical device or an emulator.
  */
-@Slf4j
-final class Device implements IDevice {
+@Slf4j final class Device implements IDevice {
     /** Emulator Serial Number regexp. */
     static final String RE_EMULATOR_SN = "emulator-(\\d+)";
     private static final String ZERO = "0";
@@ -784,11 +782,11 @@ final class Device implements IDevice {
     }
 
     @Override
-    public void installPackage(String packageFilePath, boolean reinstall,
+    public long installPackage(String packageFilePath, boolean reinstall,
         String... extraArgs)
         throws InstallException {
         // Use default basic installReceiver
-        installPackage(packageFilePath, reinstall, new InstallReceiver(), extraArgs);
+        return installPackage(packageFilePath, reinstall, new InstallReceiver(), extraArgs);
     }
 
     @Override
@@ -812,14 +810,14 @@ final class Device implements IDevice {
     }
 
     @Override
-    public void installPackage(
+    public long installPackage(
         String packageFilePath,
         boolean reinstall,
         InstallReceiver receiver,
         String... extraArgs)
         throws InstallException {
         // Use default values for some timeouts.
-        installPackage(
+        return installPackage(
             packageFilePath,
             reinstall,
             receiver,
@@ -830,7 +828,7 @@ final class Device implements IDevice {
     }
 
     @Override
-    public void installPackage(
+    public long installPackage(
         String packageFilePath,
         boolean reinstall,
         InstallReceiver receiver,
@@ -841,7 +839,7 @@ final class Device implements IDevice {
         throws InstallException {
         try {
             String remoteFilePath = syncPackageToDevice(packageFilePath);
-            installRemotePackage(
+            long time = installRemotePackage(
                 remoteFilePath,
                 reinstall,
                 receiver,
@@ -850,6 +848,7 @@ final class Device implements IDevice {
                 maxTimeUnits,
                 extraArgs);
             removeRemotePackage(remoteFilePath);
+            return time;
         } catch (IOException | AdbCommandRejectedException | TimeoutException | SyncException e) {
             throw new InstallException(e);
         }
@@ -976,7 +975,7 @@ final class Device implements IDevice {
     }
 
     @Override
-    public void installRemotePackage(
+    public long installRemotePackage(
         String remoteFilePath,
         boolean reinstall,
         @NonNull InstallReceiver receiver,
@@ -995,11 +994,13 @@ final class Device implements IDevice {
             }
             String cmd = String.format("pm install %1$s \"%2$s\"", optionString.toString(),
                 remoteFilePath);
+            long start = System.currentTimeMillis();
             executeShellCommand(cmd, receiver, maxTimeout, maxTimeToOutputResponse, maxTimeUnits);
             String error = receiver.getErrorMessage();
             if (error != null) {
                 throw new InstallException(error);
             }
+            return System.currentTimeMillis() - start;
         } catch (TimeoutException
             | AdbCommandRejectedException
             | ShellCommandUnresponsiveException

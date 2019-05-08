@@ -548,9 +548,10 @@ public interface IDevice extends IShellEnabledDevice {
      * @param packageFilePath the absolute file system path to file on local host to install
      * @param reinstall set to <code>true</code> if re-install of app should be performed
      * @param extraArgs optional extra arguments to pass. See 'adb shell pm install --help' for available options.
+     * @return install time
      * @throws InstallException if the installation fails.
      */
-    void installPackage(String packageFilePath, boolean reinstall, String... extraArgs)
+    long installPackage(String packageFilePath, boolean reinstall, String... extraArgs)
         throws InstallException;
 
     /**
@@ -572,9 +573,10 @@ public interface IDevice extends IShellEnabledDevice {
      * @param reinstall set to <code>true</code> if re-install of app should be performed
      * @param receiver The {@link InstallReceiver} to be used to monitor the install and get final status.
      * @param extraArgs optional extra arguments to pass. See 'adb shell pm install --help' for available options.
+     * @return install time
      * @throws InstallException if the installation fails.
      */
-    void installPackage(
+    long installPackage(
         String packageFilePath,
         boolean reinstall,
         InstallReceiver receiver,
@@ -595,9 +597,10 @@ public interface IDevice extends IShellEnabledDevice {
      * <var>receiver</var> cancels the execution) for command output and never throw.
      * @param maxTimeUnits Units for non-zero {@code maxTimeout} and {@code maxTimeToOutputResponse} values.
      * @param extraArgs optional extra arguments to pass. See 'adb shell pm install --help' for available options.
+     * @return install time
      * @throws InstallException if the installation fails.
      */
-    void installPackage(
+    long installPackage(
         String packageFilePath,
         boolean reinstall,
         InstallReceiver receiver,
@@ -741,9 +744,10 @@ public interface IDevice extends IShellEnabledDevice {
      * <var>receiver</var> cancels the execution) for command output and never throw.
      * @param maxTimeUnits Units for non-zero {@code maxTimeout} and {@code maxTimeToOutputResponse} values.
      * @param extraArgs optional extra arguments to pass. See 'adb shell pm install --help' for available options.
+     * @return install time
      * @throws InstallException if the installation fails.
      */
-    void installRemotePackage(
+    long installRemotePackage(
         String remoteFilePath,
         boolean reinstall,
         InstallReceiver receiver,

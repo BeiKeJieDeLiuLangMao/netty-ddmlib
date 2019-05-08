@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
  */
 public class InstallReceiver extends MultiLineReceiver {
 
-    private static final String SUCCESS_OUTPUT = "Success"; //$NON-NLS-1$
+    private static final String SUCCESS_OUTPUT = "Success";
 
     /**
      * A pattern to parse strings of the form
@@ -21,7 +21,7 @@ public class InstallReceiver extends MultiLineReceiver {
      * the "ERROR" part as error code.
      */
     private static final Pattern FAILURE_PATTERN =
-            Pattern.compile("Failure\\s+\\[(([^:]*)(:.*)?)\\]"); //$NON-NLS-1$
+            Pattern.compile("Failure\\s+\\[(([^:]*)(:.*)?)\\]");
 
     private String mErrorMessage = null;
     private String mSuccessMessage = null;
