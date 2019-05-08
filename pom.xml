@@ -84,12 +84,12 @@
         <plugins>
             <!-- Source -->
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
                 <version>3.0.1</version>
                 <executions>
                     <execution>
-                        <phase>package</phase>
+                        <id>attach-sources</id>
+                        <phase>verify</phase>
                         <goals>
                             <goal>jar-no-fork</goal>
                         </goals>
@@ -99,12 +99,27 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.1</version>
+                <version>3.7.0</version>
                 <configuration>
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
+                    <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
+    <distributionManagement>
+        <repository>
+            <id>releases</id>
+            <!--suppress MavenModelInspection -->
+            <url>${INTERNAL_MAVEN_REPOSITORIES}/releases</url>
+        </repository>
+
+        <snapshotRepository>
+            <id>snapshots</id>
+            <!--suppress MavenModelInspection -->
+            <url>${INTERNAL_MAVEN_REPOSITORIES}/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
 </project>
