@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
@@ -929,7 +930,7 @@ import static com.android.sdklib.AndroidVersion.VersionCodes.KITKAT;
     public String syncPackageToDevice(InputStream localFileStream) throws TimeoutException, AdbCommandRejectedException,
         IOException, SyncException {
         try (SyncService sync = getSyncService()) {
-            String packageFileName = getFileName(localFileStream.toString());
+            String packageFileName = localFileStream.hashCode() + "-" + ThreadLocalRandom.current().nextInt() + ".apk";
             String remoteFilePath = String.format("/data/local/tmp/%1$s", packageFileName);
             log.debug(String.format("Uploading %1$s onto device '%2$s'", packageFileName, getSerialNumber()));
             if (sync != null) {
