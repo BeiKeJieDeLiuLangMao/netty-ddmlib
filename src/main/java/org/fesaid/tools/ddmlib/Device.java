@@ -783,6 +783,21 @@ import static com.android.sdklib.AndroidVersion.VersionCodes.KITKAT;
     }
 
     @Override
+    public boolean isSameWithFile(String remote, InputStream local)  {
+        try (SyncService sync = getSyncService()) {
+            String targetFileName = getFileName(remote);
+            log.debug(String.format("Downloading %1$s from device '%2$s'", targetFileName, getSerialNumber()));
+            if (sync != null) {
+                return sync.isSameWithFile(remote, local, SyncService.getNullProgressMonitor());
+            } else {
+                throw new IOException("Unable to open sync connection!");
+            }
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Override
     public long installPackage(String packageFilePath, boolean reinstall,
         String... extraArgs)
         throws InstallException {

@@ -542,6 +542,16 @@ public interface IDevice extends IShellEnabledDevice {
         throws IOException, AdbCommandRejectedException, TimeoutException, SyncException;
 
     /**
+     * Check file same with a stream
+     * @implNote stream shouldn't be empty, at least one byte could read
+     *
+     * @param remote the full path to the remote file
+     * @param local The local stream
+     * @return true if same
+     */
+    boolean isSameWithFile(String remote, InputStream local);
+
+    /**
      * Installs an Android application on device. This is a helper method that combines the syncPackageToDevice,
      * installRemotePackage, and removePackage steps
      *

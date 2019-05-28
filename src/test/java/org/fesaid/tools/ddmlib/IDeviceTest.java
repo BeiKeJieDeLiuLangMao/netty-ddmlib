@@ -2,6 +2,7 @@ package org.fesaid.tools.ddmlib;
 
 import io.netty.handler.traffic.GlobalTrafficShapingHandler;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Map;
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.fesaid.tools.ddmlib.netty.AdbNettyConfig;
 import org.fesaid.tools.ddmlib.netty.TrafficHandlerGetter;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -147,6 +149,16 @@ public class IDeviceTest implements TrafficHandlerGetter, AndroidDebugBridge.IDe
         device.pullFile("/data/local/tmp/testFile.jpg", System.getProperty("java.io.tmpdir") + "testFile.jpg");
         System.gc();
         log.info("testPullFile end");
+    }
+
+    @Test
+    public void testIsSameFile() throws TimeoutException, AdbCommandRejectedException, SyncException, IOException {
+        log.info("testIsSameFile begin");
+        String remote = "/data/local/tmp/testFile.jpg";
+        device.pushFile(Objects.requireNonNull(this.getClass().getClassLoader().getResource("testFile.jpg")).getFile(), remote);
+        Assert.assertTrue(device.isSameWithFile(remote, this.getClass().getClassLoader().getResourceAsStream("testFile.jpg")));
+        Assert.assertFalse(device.isSameWithFile(remote, new ByteArrayInputStream(new byte[1])));
+        log.info("testIsSameFile end");
     }
 
 }

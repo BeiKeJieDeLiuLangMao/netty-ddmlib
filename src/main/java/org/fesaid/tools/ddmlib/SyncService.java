@@ -16,6 +16,7 @@ import org.fesaid.tools.ddmlib.SyncException.SyncError;
 import org.fesaid.tools.ddmlib.netty.AdbConnection;
 import org.fesaid.tools.ddmlib.netty.input.PullFileHandler;
 import org.fesaid.tools.ddmlib.netty.input.PushFileHandler;
+import org.fesaid.tools.ddmlib.netty.input.SameFileCheckHandler;
 import org.fesaid.tools.ddmlib.netty.input.StatFileHandler;
 import org.fesaid.tools.ddmlib.utils.ArrayHelper;
 import org.fesaid.tools.ddmlib.utils.FilePermissionUtil;
@@ -77,6 +78,7 @@ public class SyncService implements Closeable {
 
     public static final int SYNC_DATA_MAX = 64 * 1024;
     private static final int REMOTE_PATH_MAX_LENGTH = 1024;
+
 
     /**
      * Classes which implement this interface provide methods that deal with displaying transfer progress.
@@ -313,6 +315,18 @@ public class SyncService implements Closeable {
         monitor.stop();
     }
 
+    public boolean isSameWithFile(String remoteFilepath, InputStream localStream, ISyncProgressMonitor monitor)
+        throws TimeoutException, SyncException {
+        FileStat fileStat = statFile(remoteFilepath);
+        if (fileStat.getMode() == 0) {
+            return false;
+        }
+        monitor.start(0);
+        boolean result = compareFile(remoteFilepath, localStream, monitor);
+        monitor.stop();
+        return result;
+    }
+
     /**
      * Push several files.
      *
@@ -491,6 +505,21 @@ public class SyncService implements Closeable {
         // read the result, in a byte array containing 2 ints (id, size)
         pullFileHandler.waitRespondBegin(getTimeOut(), MILLISECONDS);
         pullFileHandler.waitFinish();
+    }
+
+    private boolean compareFile(String remotePath, InputStream localStream, ISyncProgressMonitor monitor) throws
+        SyncException, TimeoutException {
+
+        if (remotePath.getBytes(AdbHelper.DEFAULT_CHARSET).length > REMOTE_PATH_MAX_LENGTH) {
+            throw new SyncException(SyncError.REMOTE_PATH_LENGTH);
+        }
+        // create the full request message
+        SameFileCheckHandler sameFileCheckHandler = new SameFileCheckHandler(monitor, localStream);
+        mChannel.syncSendAndHandle(createFileReq(ID_RECV, remotePath.getBytes(AdbHelper.DEFAULT_CHARSET)), sameFileCheckHandler,
+            getTimeOut(), MILLISECONDS);
+        // read the result, in a byte array containing 2 ints (id, size)
+        sameFileCheckHandler.waitRespondBegin(getTimeOut(), MILLISECONDS);
+        return sameFileCheckHandler.waitFinish();
     }
 
     /**
