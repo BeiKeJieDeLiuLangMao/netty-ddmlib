@@ -1099,7 +1099,11 @@ public class AndroidDebugBridge {
         if (!sUnitTestMode) {
             sAdbServerPort = getAdbServerPort();
         }
-        sSocketAddr = new InetSocketAddress(DdmPreferences.getAdbHostValue(), sAdbServerPort);
+        if (DdmPreferences.getUseAdbHost()) {
+            sSocketAddr = new InetSocketAddress(DdmPreferences.getAdbHostValue(), sAdbServerPort);
+        } else {
+            sSocketAddr = new InetSocketAddress(InetAddress.getLoopbackAddress(), sAdbServerPort);
+        }
     }
 
     /**
