@@ -55,6 +55,8 @@ public class AndroidDebugBridge {
      */
     private static final int DEFAULT_ADB_PORT = 5037;
 
+    private static int ADB_PORT = DEFAULT_ADB_PORT;
+
     /**
      * Only set when in unit testing mode. This is a hack until we move to devicelib.
      * http://b.android.com/221925
@@ -1152,7 +1154,11 @@ public class AndroidDebugBridge {
         }
 
         // use default port if neither are set
-        return DEFAULT_ADB_PORT;
+        return ADB_PORT;
+    }
+
+    public static void setAdbPort(int port) {
+        ADB_PORT = port;
     }
 
     /**
