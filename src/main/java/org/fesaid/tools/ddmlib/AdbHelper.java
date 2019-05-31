@@ -72,7 +72,7 @@ import static org.fesaid.tools.ddmlib.AdbHelper.AdbService.SHELL;
         public String message;
     }
 
-    static AdbConnection connect(InetSocketAddress address, String serialNumber) throws IOException {
+    public static AdbConnection connect(InetSocketAddress address, String serialNumber) throws IOException {
         return adbConnector.connect(address, serialNumber);
     }
 

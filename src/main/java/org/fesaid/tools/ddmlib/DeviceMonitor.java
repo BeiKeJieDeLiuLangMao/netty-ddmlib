@@ -52,8 +52,9 @@ import static org.fesaid.tools.ddmlib.AdbHelper.connect;
  * are multiplexed over a single selector.
  */
 @SuppressWarnings("unused")
-@Slf4j final class DeviceMonitor implements ClientTracker {
-    private static final String ADB_TRACK_DEVICES_COMMAND = "host:track-devices";
+@Slf4j
+public final class DeviceMonitor implements ClientTracker {
+    public static final String ADB_TRACK_DEVICES_COMMAND = "host:track-devices";
     private static final String ADB_TRACK_JDWP_COMMAND = "track-jdwp";
 
     private volatile boolean mQuit = false;

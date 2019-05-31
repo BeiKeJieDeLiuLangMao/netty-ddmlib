@@ -1,8 +1,10 @@
 package org.fesaid.tools.ddmlib.netty;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
 import java.io.Closeable;
 import java.io.InputStream;
 import java.util.Objects;
@@ -11,6 +13,7 @@ import org.fesaid.tools.ddmlib.AdbCommandRejectedException;
 import org.fesaid.tools.ddmlib.TimeoutException;
 import org.fesaid.tools.ddmlib.netty.input.AdbInputHandler;
 import org.fesaid.tools.ddmlib.netty.input.AdbRespondHandler;
+import org.fesaid.tools.ddmlib.netty.input.ProxyInputHandler;
 import org.fesaid.tools.ddmlib.netty.output.AdbOutputHandler;
 import org.fesaid.tools.ddmlib.netty.output.AdbStreamOutputHandler;
 import org.fesaid.tools.ddmlib.netty.output.AdbStringOutputHandler;
@@ -21,6 +24,7 @@ import org.fesaid.tools.ddmlib.netty.output.AdbStringOutputHandler;
 public class AdbConnection implements Closeable {
 
     private Channel channel;
+    private boolean alreadyProxy = false;
 
     AdbConnection(Channel channel) {
         this.channel = channel;
@@ -38,6 +42,21 @@ public class AdbConnection implements Closeable {
         if (!adbRespondHandler.getOkay()) {
             throw new AdbCommandRejectedException(adbRespondHandler.getMessage());
         }
+    }
+
+    public boolean isActive() {
+        return channel != null && channel.isActive();
+    }
+
+    public void buildProxyConnectionIfNecessary(ChannelHandlerContext ctx, String serialNumber) {
+        if (!alreadyProxy) {
+            channel.pipeline().addLast(new ProxyInputHandler(ctx, serialNumber));
+            alreadyProxy = true;
+        }
+    }
+
+    public void writeAndFlush(ByteBuf buf) {
+        channel.writeAndFlush(buf);
     }
 
     public synchronized void syncSendAndHandle(byte[] bytes, AdbInputHandler handler, long timeout, TimeUnit timeUnit) {

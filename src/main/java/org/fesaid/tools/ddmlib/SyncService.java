@@ -37,7 +37,7 @@ import static org.fesaid.tools.ddmlib.DdmPreferences.getTimeOut;
 @Slf4j
 public class SyncService implements Closeable {
     public static final int HEADER_LENGTH = 8;
-    private static final byte[] ID_OKAY = {'O', 'K', 'A', 'Y'};
+    public static final byte[] ID_OKAY = {'O', 'K', 'A', 'Y'};
     private static final byte[] ID_FAIL = {'F', 'A', 'I', 'L'};
     private static final byte[] ID_STAT = {'S', 'T', 'A', 'T'};
     private static final byte[] ID_RECV = {'R', 'E', 'C', 'V'};

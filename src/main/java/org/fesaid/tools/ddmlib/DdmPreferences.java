@@ -1,5 +1,7 @@
 package org.fesaid.tools.ddmlib;
 
+import java.util.function.Function;
+
 /**
  * Preferences for the ddm library.
  * <p>This class does not handle storing the preferences. It is merely a central point for
@@ -41,6 +43,10 @@ public final class DdmPreferences {
 
     private static boolean sUseAdbHost = DEFAULT_USE_ADBHOST;
     private static String sAdbHostValue = DEFAULT_ADBHOST_VALUE;
+
+    private static boolean openAdbProxy = false;
+    private static Integer adbProxyPort;
+    private static Function<String, Boolean> openAdbProxyChecker;
 
     /**
      * Returns the initial {@link Client} flag for thread updates.
@@ -191,6 +197,30 @@ public final class DdmPreferences {
      */
     public static void setAdbHostValue(String adbHostValue) {
         sAdbHostValue = adbHostValue;
+    }
+
+    public static void setOpenAdbProxy(boolean open) {
+        openAdbProxy = open;
+    }
+
+    public static boolean isOpenAdbProxy() {
+        return openAdbProxy;
+    }
+
+    public static int getAdbProxyPort() {
+        return adbProxyPort;
+    }
+
+    public static void setAdbProxyPort(int port) {
+        adbProxyPort = port;
+    }
+
+    public static boolean shouldOpenAdbProxy(String serialNumber) {
+        return openAdbProxyChecker != null && openAdbProxyChecker.apply(serialNumber);
+    }
+
+    public static void setOpenAdbProxyChecker(Function<String, Boolean> checker) {
+        openAdbProxyChecker = checker;
     }
 
     /**

@@ -17,6 +17,7 @@ public class AdbNettyConfig {
     private String eventExecutorGroupPrefix = "AdbBoss";
     private int eventExecutorGroupThreadSize = 1;
     private String eventLoopGroupWorkerPrefix = "AdbWorker";
+    private String proxyEventLoopGroupWorkerPrefix = "AdbProxyWorker";
     private int eventLoopGroupWorkerThreadSize = NettyRuntime.availableProcessors();
     private int connectTimeoutMills = 10000;
     private TrafficHandlerGetter trafficHandlerGetter = new DefaultTrafficHandlerGetter();

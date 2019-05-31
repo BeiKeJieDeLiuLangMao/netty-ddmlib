@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.fesaid.tools.ddmlib.netty.AdbNettyConfig;
+import org.fesaid.tools.ddmlib.netty.proxy.AdbDeviceProxy;
 
 /**
  * A connection to the host-side android debug bridge (adb)
@@ -194,6 +195,9 @@ public class AndroidDebugBridge {
         }
 
         init(clientSupport, adbNettyConfig);
+        if (DdmPreferences.isOpenAdbProxy()) {
+            AdbDeviceProxy.start(adbNettyConfig);
+        }
     }
 
     /**
